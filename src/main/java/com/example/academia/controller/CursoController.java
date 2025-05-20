@@ -6,11 +6,14 @@ import com.example.academia.entidades.CursoEntity;
 import com.example.academia.entidades.ProfesorEntity;
 import com.example.academia.servicios.CursoService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -20,6 +23,8 @@ import java.util.Set;
 @CrossOrigin(origins = "http://localhost:4200")
 @RequiredArgsConstructor
 public class CursoController {
+
+    private static final Logger log = LoggerFactory.getLogger(CursoController.class);
 
     private final CursoService cursoService;
 
@@ -58,7 +63,7 @@ public class CursoController {
 
     @GetMapping("/nivel/{nivel}")
     public ResponseEntity<Page<CursoEntity>> findByNivel(
-            @RequestParam String nivel,
+            @PathVariable String nivel,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
             @RequestParam(defaultValue = "id") String sort,
@@ -79,12 +84,12 @@ public class CursoController {
 
     @PutMapping("/{id}")
     public ResponseEntity<CursoEntity> updateCurso(@PathVariable Long id, @RequestBody CursoEntity curso) {
-        return cursoService.findById(id)
-                .map(existingCurso -> {
-                    curso.setId(id);
-                    return ResponseEntity.ok(cursoService.saveCurso(curso));
-                })
-                .orElse(ResponseEntity.notFound().build());
+        try {
+            CursoEntity updated = cursoService.updateCursoBasicInfo(id, curso);
+            return ResponseEntity.ok(updated);
+        } catch (ValidationException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 
     @DeleteMapping("/{id}")
@@ -123,7 +128,14 @@ public class CursoController {
             Set<ProfesorEntity> profesores = cursoService.getProfesoresByCurso(cursoId);
             return ResponseEntity.ok(profesores);
         } catch (ValidationException e) {
-            return ResponseEntity.notFound().build();
+            // Manejo específico para ValidationException (curso no encontrado)
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Collections.emptySet());
+        } catch (Exception e) {
+            // Loguear el error para depuración
+            log.error("Error al obtener profesores para el curso ID {}: {}", cursoId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.OK)
+                    .body(Collections.emptySet());
         }
     }
 
@@ -185,13 +197,13 @@ public class CursoController {
 
     @GetMapping("/con-plazas-disponibles")
     public ResponseEntity<Page<CursoEntity>> getCursosConPlazasDisponibles(
-            @RequestParam(defaultValue = "30") int maxAlumnos,
+            @RequestParam(defaultValue = "1") int plazasMinimas,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
             @RequestParam(defaultValue = "id") String sort,
             @RequestParam(defaultValue = "asc") String direction) {
 
-        return ResponseEntity.ok(cursoService.findCursosConPlazasDisponibles(maxAlumnos, page, size, sort, direction));
+        return ResponseEntity.ok(cursoService.findCursosConPlazasDisponibles(plazasMinimas, page, size, sort, direction));
     }
 
     @GetMapping("/{id}/detalles")

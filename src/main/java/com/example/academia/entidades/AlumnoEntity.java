@@ -6,6 +6,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
@@ -16,6 +17,7 @@ import java.util.Set;
 @Data
 @Table(name = "alumnos")
 @AllArgsConstructor
+@EqualsAndHashCode(exclude = {"usuario", "cursos"})
 @NoArgsConstructor
 public class AlumnoEntity {
     @Id
@@ -47,6 +49,6 @@ public class AlumnoEntity {
     private UsuarioEntity usuario;
 
     @ManyToMany(mappedBy = "alumnos", fetch = FetchType.LAZY)
-    @JsonIgnoreProperties({"profesores", "alumnos"})
+    @JsonIgnoreProperties({"alumno"})
     private Set<CursoEntity> cursos = new HashSet<>();
 }

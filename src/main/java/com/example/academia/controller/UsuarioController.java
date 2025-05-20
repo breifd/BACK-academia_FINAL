@@ -102,16 +102,49 @@ public class UsuarioController {
 
     @GetMapping("/usuarios/profesor/{profesorId}")
     public ResponseEntity<?> getUsuarioByProfesorId(@PathVariable Long profesorId) {
-        return usuarioService.findByProfesorId(profesorId)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+       try {
+           Optional<UsuarioEntity> usuario = usuarioService.findByProfesorId(profesorId);
+           if (usuario.isPresent()) {
+               UsuarioEntity u = usuario.get();
+               UsuarioDTO usuarioDTO = new UsuarioDTO();
+               usuarioDTO.setId(u.getId());
+               usuarioDTO.setUsername(u.getUsername());
+               usuarioDTO.setNombre(u.getNombre());
+               usuarioDTO.setApellido(u.getApellido());
+               usuarioDTO.setRol(u.getRol());
+               usuarioDTO.setProfesorId(profesorId);
+
+               return ResponseEntity.ok(usuarioDTO);
+           }
+           return ResponseEntity.notFound().build();
+       }catch (Exception e) {
+           return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+       }
     }
 
     @GetMapping("/usuarios/alumno/{alumnoId}")
     public ResponseEntity<?> getUsuarioByAlumnoId(@PathVariable Long alumnoId) {
-        return usuarioService.findByAlumnoId(alumnoId)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        try {
+            Optional<UsuarioEntity> u = usuarioService.findByAlumnoId(alumnoId);
+            if (u.isPresent()) {
+                UsuarioEntity usuario = u.get();
+
+                // Crear y llenar el DTO
+                UsuarioDTO usuarioDTO = new UsuarioDTO();
+                usuarioDTO.setId(usuario.getId());
+                usuarioDTO.setUsername(usuario.getUsername());
+                usuarioDTO.setNombre(usuario.getNombre());
+                usuarioDTO.setApellido(usuario.getApellido());
+                usuarioDTO.setRol(usuario.getRol());
+                usuarioDTO.setAlumnoId(alumnoId);
+
+                return ResponseEntity.ok(usuarioDTO);
+            }
+            return ResponseEntity.notFound().build();
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
     }
     @GetMapping("/check-username/{username}")
     public ResponseEntity<Boolean> checkUsernameExists(@PathVariable String username) {

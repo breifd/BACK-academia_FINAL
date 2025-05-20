@@ -25,8 +25,8 @@ public interface CursoRepository extends JpaRepository<CursoEntity, Long> {
     Page<CursoEntity> findByAlumnosId(@Param("alumnoId") Long alumnoId, Pageable pageable);
 
     // Cursos con menos de X alumnos (plazas disponibles)
-    @Query("SELECT c FROM CursoEntity c WHERE SIZE(c.alumnos) < :maxAlumnos")
-    Page<CursoEntity> findCursosWithLessAlumnos(@Param("maxAlumnos") int maxAlumnos, Pageable pageable);
+    @Query("SELECT c FROM CursoEntity c WHERE (:capacidadMaxima - SIZE(c.alumnos)>= :plazasMinimas)")
+    Page<CursoEntity> findCursosConPlazasDisponibles(@Param("plazasMinimas") int plazasMinimas, @Param("capacidadMaxima") int capacidadMaxima, Pageable pageable);
 
     // Cargar curso con todas sus relaciones
     @Query("SELECT c FROM CursoEntity c " +

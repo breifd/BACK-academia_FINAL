@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 import java.util.HashSet;
@@ -16,6 +17,7 @@ import java.util.Set;
 @Table(name = "profesores")
 @Data
 @NoArgsConstructor
+@EqualsAndHashCode(exclude = {"usuario", "cursos"})
 @AllArgsConstructor
 public class ProfesorEntity {
 
@@ -40,7 +42,7 @@ public class ProfesorEntity {
     @Size(max = 100)
     private String especialidad;
 
-    @Column(name = "años_experiencia")
+    @Column(name = "anhos_experiencia")
     private Integer anhosExperiencia;
 
     @OneToOne(mappedBy = "profesor")
@@ -48,6 +50,6 @@ public class ProfesorEntity {
     private UsuarioEntity usuario;
 
     @ManyToMany(mappedBy = "profesores", fetch = FetchType.LAZY)
-    @JsonIgnoreProperties({"profesores", "alumnos"})
+    @JsonIgnoreProperties({"profesor"})
     private Set<CursoEntity> cursos = new HashSet<>();
 }

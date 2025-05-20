@@ -1,17 +1,20 @@
 package com.example.academia.entidades;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "usuarios")
 @Data
 @NoArgsConstructor
+@EqualsAndHashCode(exclude = {"profesor", "alumno"})
 @AllArgsConstructor
 public class UsuarioEntity {
 
@@ -45,13 +48,13 @@ public class UsuarioEntity {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "profesor_id")
-    @JsonIgnore
+    @JsonIgnoreProperties({"usuario", "cursos"})
     private ProfesorEntity profesor;
 
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "alumno_id")
-    @JsonIgnore // Para evitar referencias circulares en JSON
+    @JsonIgnoreProperties({"usuario", "cursos"})
     private AlumnoEntity alumno;
 
 }

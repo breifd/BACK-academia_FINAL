@@ -17,6 +17,8 @@ public interface CursoService {
 
     List<CursoEntity> findAllLista();
 
+    CursoEntity updateCursoBasicInfo(Long id, CursoEntity cursoNuevo);
+
     Page<CursoEntity> findByNombre(String nombre, int page, int size, String sort, String direction);
 
     Page<CursoEntity> findByNivel(CursoEntity.NivelCurso nivel, int page, int size, String sort, String direction);

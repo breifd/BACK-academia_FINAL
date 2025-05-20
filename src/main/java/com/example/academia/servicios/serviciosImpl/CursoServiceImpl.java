@@ -53,6 +53,18 @@ public class CursoServiceImpl implements CursoService {
     }
 
     @Override
+    public CursoEntity updateCursoBasicInfo(Long id, CursoEntity cursoNuevo) {
+        CursoEntity cursoExistente = cursoRepository.findByIdWithDetails(id).orElseThrow(() -> new ValidationException("Curso no encontrado con ID: " + id));
+        // Actualizar solo información básica
+        cursoExistente.setNombre(cursoNuevo.getNombre());
+        cursoExistente.setDescripcion(cursoNuevo.getDescripcion());
+        cursoExistente.setNivel(cursoNuevo.getNivel());
+        cursoExistente.setPrecio(cursoNuevo.getPrecio());
+        // Guardar manteniendo las relaciones existentes
+        return cursoRepository.save(cursoExistente);
+    }
+
+    @Override
     public Page<CursoEntity> findByNombre(String nombre, int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
         if(nombre != null || !nombre.isEmpty()) return cursoRepository.findCursosByNombreContainingIgnoreCase(nombre,pageable);
@@ -173,9 +185,10 @@ public class CursoServiceImpl implements CursoService {
     }
 
     @Override
-    public Page<CursoEntity> findCursosConPlazasDisponibles(int maxAlumnos, int page, int size, String sort, String direction) {
+    public Page<CursoEntity> findCursosConPlazasDisponibles(int plazasMinimas, int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
-        return cursoRepository.findCursosWithLessAlumnos(maxAlumnos, pageable);
+        int capacidadMaxima=30;
+        return cursoRepository.findCursosConPlazasDisponibles(plazasMinimas,capacidadMaxima, pageable);
     }
 
     @Override
