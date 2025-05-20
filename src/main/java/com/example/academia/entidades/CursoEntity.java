@@ -62,4 +62,8 @@ public class CursoEntity{
     @JsonIgnoreProperties({"cursos", "usuario"})
     private Set<AlumnoEntity> alumnos = new HashSet<>();
 
+    @OneToMany(mappedBy = "curso")
+    @JsonIgnore
+    private Set<TareaEntity> tareas = new HashSet<>();
+
 }

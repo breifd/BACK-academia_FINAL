@@ -1,5 +1,6 @@
 package com.example.academia.entidades;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -10,6 +11,8 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Table(name = "tareas")
@@ -47,19 +50,32 @@ public class TareaEntity {
     @Column(name = "tipo_documento")
     private String tipoDocumento;
 
-    @Min(0)
-    @Max(10)
-    private Double nota;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "curso_id", nullable = false)
+    private CursoEntity curso;
 
-    //Verificamos si el documento está cargado
-    public boolean isDocumentoCargado() {
-        return documento != null && documento.length > 0;
-    }
-    @PrePersist
-    @PreUpdate
-    public void calcularNota() {
-        if (!isDocumentoCargado() && fechaLimite != null && LocalDate.now().isAfter(fechaLimite)) {
-            nota = null; //Contará como que no lo ha entregado
-        }
-    }
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "profesor_id", nullable = false)
+    private ProfesorEntity profesor;
+
+    // Si la tarea es para todos los alumnos del curso o solo algunos específicos
+    @Column(name = "para_todos_alumnos")
+    private Boolean paraTodosLosAlumnos = true;
+
+    // Alumnos específicos asignados si no es para todos
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+            name = "tarea_alumnos",
+            joinColumns = @JoinColumn(name = "tarea_id"),
+            inverseJoinColumns = @JoinColumn(name = "alumno_id")
+    )
+    private Set<AlumnoEntity> alumnosAsignados = new HashSet<>();
+
+    // Relación inversa con las entregas
+    @OneToMany(mappedBy = "tarea", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
+    private Set<EntregaEntity> entregas = new HashSet<>();
 }
+
+
+
