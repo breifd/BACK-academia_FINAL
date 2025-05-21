@@ -26,23 +26,16 @@ public interface EntregaRepository extends JpaRepository<EntregaEntity, Long> {
     Page<EntregaEntity> findByEstado(EntregaEntity.EstadoEntrega estado, Pageable pageable);
 
     // Buscar entregas pendientes de calificación para un profesor
-    @Query("SELECT e FROM EntregaEntity e " +
-            "WHERE e.tarea.profesor.id = :profesorId " +
-            "AND e.estado = 'ENTREGADA'")
-    Page<EntregaEntity> findEntregasPendientesCalificacion(
-            @Param("profesorId") Long profesorId,
-            Pageable pageable);
+    @Query("SELECT e FROM EntregaEntity e WHERE e.tarea.profesor.id = :profesorId AND e.estado = 'ENTREGADA'")
+    Page<EntregaEntity> findEntregasPendientesCalificacion(@Param("profesorId") Long profesorId, Pageable pageable);
 
     // Contar entregas pendientes para un profesor
-    @Query("SELECT COUNT(e) FROM EntregaEntity e " +
-            "WHERE e.tarea.profesor.id = :profesorId " +
-            "AND e.estado = 'ENTREGADA'")
+    @Query("SELECT COUNT(e) FROM EntregaEntity e WHERE e.tarea.profesor.id = :profesorId AND e.estado = 'ENTREGADA'")
     Long countEntregasPendientesCalificacion(@Param("profesorId") Long profesorId);
 
     // Estadísticas: Nota media de entregas por tarea
-    @Query("SELECT AVG(e.nota) FROM EntregaEntity e " +
-            "WHERE e.tarea.id = :tareaId AND e.nota IS NOT NULL")
+    @Query("SELECT AVG(e.nota) FROM EntregaEntity e WHERE e.tarea.id = :tareaId AND e.nota IS NOT NULL")
     Double getNotaMediaByTarea(@Param("tareaId") Long tareaId);
 }
 
-}
+
