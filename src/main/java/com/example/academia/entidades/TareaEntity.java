@@ -1,6 +1,7 @@
 package com.example.academia.entidades;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -19,6 +20,7 @@ import java.util.Set;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "entregas"})
 public class TareaEntity {
 
     @Id
@@ -52,10 +54,12 @@ public class TareaEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "curso_id", nullable = false)
+    @JsonIgnoreProperties({"profesores", "alumnos", "tareas"})
     private CursoEntity curso;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "profesor_id", nullable = false)
+    @JsonIgnoreProperties({"cursos", "usuario", "tareas"})
     private ProfesorEntity profesor;
 
     // Si la tarea es para todos los alumnos del curso o solo algunos específicos
@@ -69,6 +73,7 @@ public class TareaEntity {
             joinColumns = @JoinColumn(name = "tarea_id"),
             inverseJoinColumns = @JoinColumn(name = "alumno_id")
     )
+    @JsonIgnoreProperties({"cursos", "usuario", "tareasAsignadas", "entregas"})
     private Set<AlumnoEntity> alumnosAsignados = new HashSet<>();
 
     // Relación inversa con las entregas

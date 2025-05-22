@@ -50,7 +50,7 @@ public class CursoEntity{
             joinColumns = @JoinColumn(name = "curso_id"),
             inverseJoinColumns = @JoinColumn(name = "profesor_id")
     )
-    @JsonIgnoreProperties({"cursos", "usuario"})
+    @JsonIgnoreProperties({"cursos", "usuario", "tareas"})
     private Set<ProfesorEntity> profesores = new HashSet<>();
     //*Cuando serialices un ProfesorEntity dentro de este contexto, ignora sus propiedades cursos y usuario. No las incluyas en el JSON.
     @ManyToMany(fetch = FetchType.LAZY)
@@ -59,11 +59,13 @@ public class CursoEntity{
             joinColumns = @JoinColumn(name = "curso_id"),
             inverseJoinColumns = @JoinColumn(name = "alumno_id")
     )
-    @JsonIgnoreProperties({"cursos", "usuario"})
+    @JsonIgnoreProperties({"cursos", "usuario", "tareasAsignadas","entregas"})
     private Set<AlumnoEntity> alumnos = new HashSet<>();
 
     @OneToMany(mappedBy = "curso")
     @JsonIgnore
     private Set<TareaEntity> tareas = new HashSet<>();
+
+
 
 }

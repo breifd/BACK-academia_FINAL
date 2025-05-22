@@ -2,8 +2,10 @@ package com.example.academia.servicios.serviciosImpl;
 
 import com.example.academia.Exceptions.ValidationException;
 import com.example.academia.entidades.AlumnoEntity;
+import com.example.academia.entidades.CursoEntity;
 import com.example.academia.entidades.UsuarioEntity;
 import com.example.academia.repositorios.AlumnoRepository;
+import com.example.academia.repositorios.CursoRepository;
 import com.example.academia.repositorios.UsuarioRepository;
 import com.example.academia.servicios.AlumnoService;
 import com.example.academia.validators.UsuarioValidator;
@@ -22,6 +24,7 @@ public class AlumnoServiceImpl implements AlumnoService {
     private final AlumnoRepository aRepository;
     private final UsuarioRepository usuarioRepository;
     private final UsuarioValidator usuarioValidator;
+    private final CursoRepository cursoRepository;
 
     private Pageable crearPageable(int page, int size, String sort, String direction) {
         Sort.Direction sortDirection=direction.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
@@ -106,6 +109,13 @@ public class AlumnoServiceImpl implements AlumnoService {
         usuarioRepository.save(usuario);
 
         return alumnoActual;
+    }
+
+    @Override
+    public Page<CursoEntity> getCursosByAlumno(Long alumnoId, int page, int size, String sort, String direction) {
+        Pageable pageable = crearPageable(page, size, sort, direction);
+        AlumnoEntity alumno = aRepository.findById(alumnoId).orElseThrow(()-> new ValidationException("No existe ningun alumno con id " + alumnoId));
+        return cursoRepository.findByAlumnosId(alumnoId,pageable);
     }
 
     @Override

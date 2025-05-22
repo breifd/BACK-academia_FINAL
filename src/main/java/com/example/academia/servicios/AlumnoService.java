@@ -1,6 +1,7 @@
 package com.example.academia.servicios;
 
 import com.example.academia.entidades.AlumnoEntity;
+import com.example.academia.entidades.CursoEntity;
 import com.example.academia.entidades.UsuarioEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -21,6 +22,8 @@ public interface AlumnoService {
     AlumnoEntity updateAlumno(Long id, AlumnoEntity alumno, boolean syncUsuario);
     //
     AlumnoEntity createAlumnoWithUser(AlumnoEntity alumno, UsuarioEntity usuario);
+
+    Page<CursoEntity> getCursosByAlumno(Long alumnoId, int page, int size, String sort , String direction);
 
     void deleteAlumno(Long id);
 }

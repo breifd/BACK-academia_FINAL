@@ -49,7 +49,7 @@ public class AlumnoEntity {
     private UsuarioEntity usuario;
 
     @ManyToMany(mappedBy = "alumnos", fetch = FetchType.LAZY)
-    @JsonIgnoreProperties({"profesores","alumnos"})
+    @JsonIgnore
     private Set<CursoEntity> cursos = new HashSet<>();
 
     @ManyToMany(mappedBy = "alumnosAsignados")
@@ -59,4 +59,6 @@ public class AlumnoEntity {
     @OneToMany(mappedBy = "alumno")
     @JsonIgnore
     private Set<EntregaEntity> entregas = new HashSet<>();
+
+
 }

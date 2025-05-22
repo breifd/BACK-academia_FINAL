@@ -2,6 +2,7 @@ package com.example.academia.controller;
 
 import com.example.academia.Exceptions.ValidationException;
 import com.example.academia.entidades.AlumnoEntity;
+import com.example.academia.entidades.CursoEntity;
 import com.example.academia.entidades.UsuarioEntity;
 import com.example.academia.servicios.AlumnoService;
 import lombok.RequiredArgsConstructor;
@@ -70,6 +71,21 @@ public class AlumnoController {
                                                             @RequestParam(defaultValue = "id") String sort,
                                                             @RequestParam(defaultValue = "asc" ) String direction) {
         return ResponseEntity.ok(alumnoService.findAll(page, size, sort, direction));
+    }
+    @GetMapping("/{id}/cursos")
+    public ResponseEntity<Page<CursoEntity>> getCursosByAlumno(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sort,
+            @RequestParam(defaultValue = "asc") String direction) {
+
+        try {
+            Page<CursoEntity> cursos = alumnoService.getCursosByAlumno(id, page, size, sort, direction);
+            return ResponseEntity.ok(cursos);
+        } catch (ValidationException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
     @GetMapping("/{id}")
     public ResponseEntity<AlumnoEntity> getAlumnoById(@PathVariable long id) {

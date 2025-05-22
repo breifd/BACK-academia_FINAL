@@ -1,5 +1,6 @@
 package com.example.academia.entidades;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -12,6 +13,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler", "entregas"})
 public class EntregaEntity {
 
     public enum EstadoEntrega{
@@ -23,10 +25,12 @@ public class EntregaEntity {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "tarea_id", nullable = false)
+    @JsonIgnoreProperties({"alumnosAsignados", "entregas", "curso", "profesor"})
     private TareaEntity tarea;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "alumno_id", nullable = false)
+    @JsonIgnoreProperties({"cursos", "usuario", "tareasAsignadas", "entregas"})
     private AlumnoEntity alumno;
 
     @Column(name = "estado")
