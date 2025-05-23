@@ -2,11 +2,16 @@ package com.example.academia.servicios.serviciosImpl;
 
 import com.example.academia.DTOs.CalificacionDTO;
 import com.example.academia.DTOs.DocumentoDTO;
-import com.example.academia.DTOs.EntregaRequestDTO;
+import com.example.academia.DTOs.Created.EntregaCreateDTO;
+import com.example.academia.DTOs.Response.EntregaResponseDTO;
+import com.example.academia.DTOs.SimpleDTO.EntregaSimpleDTO;
 import com.example.academia.Exceptions.ValidationException;
 import com.example.academia.entidades.AlumnoEntity;
 import com.example.academia.entidades.EntregaEntity;
 import com.example.academia.entidades.TareaEntity;
+import com.example.academia.mappers.CalificacionMapper;
+import com.example.academia.mappers.DocumentoMapper;
+import com.example.academia.mappers.EntregaMapper;
 import com.example.academia.repositorios.AlumnoRepository;
 import com.example.academia.repositorios.EntregaRepository;
 import com.example.academia.repositorios.ProfesorRepository;
@@ -32,7 +37,9 @@ public class EntregaServiceImpl implements EntregaService {
     private final EntregaRepository entregaRepository;
     private final TareaRepository tareaRepository;
     private final AlumnoRepository alumnoRepository;
-    private final ProfesorRepository profesorRepository;
+    private final EntregaMapper entregaMapper;
+    private final DocumentoMapper documentoMapper;
+    private final CalificacionMapper calificacionMapper;
 
     // Método auxiliar para crear un Pageable
     private Pageable createPageable(int page, int size, String sort, String direction) {
@@ -44,19 +51,21 @@ public class EntregaServiceImpl implements EntregaService {
     // -- Implementaciones de métodos CRUD básicos -- //
 
     @Override
-    public Page<EntregaEntity> findAll(int page, int size, String sort, String direction) {
+    public Page<EntregaResponseDTO> findAll(int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
-        return entregaRepository.findAll(pageable);
+        return entregaRepository.findAll(pageable).map(entregaMapper::toEntregaResponseDTO);
     }
 
     @Override
-    public Optional<EntregaEntity> findById(Long id) {
-        return entregaRepository.findById(id);
+    public Optional<EntregaResponseDTO> findById(Long id) {
+        return entregaRepository.findById(id).map(entregaMapper::toEntregaResponseDTO);
     }
 
     @Override
-    public EntregaEntity saveEntrega(EntregaEntity entrega) {
-        return entregaRepository.save(entrega);
+    public EntregaResponseDTO saveEntrega(EntregaCreateDTO entrega) {
+        EntregaEntity entregaEntity = entregaMapper.toEntregaEntity(entrega);
+        EntregaEntity savedEntrega = entregaRepository.save(entregaEntity);
+        return entregaMapper.toEntregaResponseDTO(savedEntrega);
     }
 
     @Override
@@ -67,39 +76,49 @@ public class EntregaServiceImpl implements EntregaService {
     // -- Implementaciones de métodos de búsqueda -- //
 
     @Override
-    public Page<EntregaEntity> findByTarea(Long tareaId, int page, int size, String sort, String direction) {
+    public Page<EntregaResponseDTO> findByTarea(Long tareaId, int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
-        return entregaRepository.findByTareaId(tareaId, pageable);
+        return entregaRepository.findByTareaId(tareaId, pageable)
+                .map(entregaMapper::toEntregaResponseDTO);
     }
 
     @Override
-    public Page<EntregaEntity> findByAlumno(Long alumnoId, int page, int size, String sort, String direction) {
+    public Page<EntregaResponseDTO> findByAlumno(Long alumnoId, int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
-        return entregaRepository.findByAlumnoId(alumnoId, pageable);
+        return entregaRepository.findByAlumnoId(alumnoId, pageable)
+                .map(entregaMapper::toEntregaResponseDTO);
     }
 
     @Override
-    public Optional<EntregaEntity> findByTareaAndAlumno(Long tareaId, Long alumnoId) {
-        return entregaRepository.findByTareaIdAndAlumnoId(tareaId, alumnoId);
+    public Optional<EntregaResponseDTO> findByTareaAndAlumno(Long tareaId, Long alumnoId) {
+        return entregaRepository.findByTareaIdAndAlumnoId(tareaId, alumnoId)
+                .map(entregaMapper::toEntregaResponseDTO);
     }
 
     @Override
-    public Page<EntregaEntity> findByEstado(EntregaEntity.EstadoEntrega estado, int page, int size, String sort, String direction) {
+    public Page<EntregaResponseDTO> findByEstado(String estado, int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
-        return entregaRepository.findByEstado(estado, pageable);
+        try {
+            EntregaEntity.EstadoEntrega estadoEnum = EntregaEntity.EstadoEntrega.valueOf(estado);
+            return entregaRepository.findByEstado(estadoEnum, pageable)
+                    .map(entregaMapper::toEntregaResponseDTO);
+        } catch (IllegalArgumentException e) {
+            throw new ValidationException("Estado no válido: " + estado);
+        }
     }
 
     @Override
-    public Page<EntregaEntity> findEntregasPendientesCalificacion(Long profesorId, int page, int size, String sort, String direction) {
+    public Page<EntregaResponseDTO> findEntregasPendientesCalificacion(Long profesorId, int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
-        return entregaRepository.findEntregasPendientesCalificacion(profesorId, pageable);
+        return entregaRepository.findEntregasPendientesCalificacion(profesorId, pageable)
+                .map(entregaMapper::toEntregaResponseDTO);
     }
 
     // -- Implementaciones de métodos específicos de negocio -- //
 
     @Override
     @Transactional
-    public EntregaEntity crearEntrega(EntregaRequestDTO entregaDTO, Long alumnoId) {
+    public EntregaResponseDTO crearEntrega(EntregaCreateDTO entregaDTO, Long alumnoId) {
         // Verificar que la tarea existe
         TareaEntity tarea = tareaRepository.findById(entregaDTO.getTareaId())
                 .orElseThrow(() -> new ValidationException("Tarea no encontrada con ID: " + entregaDTO.getTareaId()));
@@ -121,7 +140,7 @@ public class EntregaServiceImpl implements EntregaService {
         }
 
         // Crear la entrega
-        EntregaEntity entrega = new EntregaEntity();
+        EntregaEntity entrega = entregaMapper.toEntregaEntity(entregaDTO);
         entrega.setTarea(tarea);
         entrega.setAlumno(alumno);
         entrega.setFechaEntrega(LocalDateTime.now());
@@ -134,7 +153,8 @@ public class EntregaServiceImpl implements EntregaService {
             entrega.setEstado(EntregaEntity.EstadoEntrega.ENTREGADA);
         }
 
-        return entregaRepository.save(entrega);
+        EntregaEntity savedEntrega = entregaRepository.save(entrega);
+        return entregaMapper.toEntregaResponseDTO(savedEntrega);
     }
 
     private boolean isAlumnoAsignadoATarea(TareaEntity tarea, Long alumnoId) {
@@ -152,7 +172,7 @@ public class EntregaServiceImpl implements EntregaService {
 
     @Override
     @Transactional
-    public EntregaEntity calificarEntrega(Long entregaId, CalificacionDTO calificacionDTO, Long profesorId) {
+    public EntregaResponseDTO calificarEntrega(Long entregaId, CalificacionDTO calificacionDTO, Long profesorId) {
         // Verificar que la entrega existe
         EntregaEntity entrega = entregaRepository.findById(entregaId)
                 .orElseThrow(() -> new ValidationException("Entrega no encontrada con ID: " + entregaId));
@@ -173,11 +193,11 @@ public class EntregaServiceImpl implements EntregaService {
         }
 
         // Actualizar la entrega
-        entrega.setNota(calificacionDTO.getNota());
-        entrega.setComentarios(calificacionDTO.getComentarios());
+        calificacionMapper.updateEntregaFromCalificacion(calificacionDTO, entrega);
         entrega.setEstado(EntregaEntity.EstadoEntrega.CALIFICADA);
 
-        return entregaRepository.save(entrega);
+        EntregaEntity savedEntrega = entregaRepository.save(entrega);
+        return entregaMapper.toEntregaResponseDTO(savedEntrega);
     }
 
     // -- Implementaciones de métodos de estadísticas -- //
@@ -196,7 +216,7 @@ public class EntregaServiceImpl implements EntregaService {
 
     @Override
     @Transactional
-    public EntregaEntity uploadDocumento(Long entregaId, MultipartFile file, Long alumnoId) throws IOException {
+    public EntregaResponseDTO uploadDocumento(Long entregaId, MultipartFile file, Long alumnoId) throws IOException {
         // Verificar que la entrega existe
         EntregaEntity entrega = entregaRepository.findById(entregaId)
                 .orElseThrow(() -> new ValidationException("Entrega no encontrada con ID: " + entregaId));
@@ -222,7 +242,8 @@ public class EntregaServiceImpl implements EntregaService {
             entrega.setEstado(EntregaEntity.EstadoEntrega.ENTREGADA);
         }
 
-        return entregaRepository.save(entrega);
+        EntregaEntity savedEntrega = entregaRepository.save(entrega);
+        return entregaMapper.toEntregaResponseDTO(savedEntrega);
     }
 
     @Override
@@ -234,7 +255,7 @@ public class EntregaServiceImpl implements EntregaService {
             throw new ValidationException("La entrega no tiene documento");
         }
 
-        return new DocumentoDTO(
+        return documentoMapper.toDocumentoDTO(
                 entrega.getNombreDocumento(),
                 entrega.getTipoDocumento(),
                 entrega.getDocumento()
@@ -255,4 +276,3 @@ public class EntregaServiceImpl implements EntregaService {
         return entrega.isPresent() && entrega.get().getTarea().getProfesor().getId().equals(profesorId);
     }
 }
-

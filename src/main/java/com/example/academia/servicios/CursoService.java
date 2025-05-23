@@ -1,8 +1,11 @@
 package com.example.academia.servicios;
 
-import com.example.academia.entidades.AlumnoEntity;
-import com.example.academia.entidades.CursoEntity;
-import com.example.academia.entidades.ProfesorEntity;
+import com.example.academia.DTOs.Created.CursoCreateDTO;
+import com.example.academia.DTOs.CursoConDetallesDTO;
+import com.example.academia.DTOs.Response.AlumnoResponseDTO;
+import com.example.academia.DTOs.Response.CursoResponseDTO;
+import com.example.academia.DTOs.Response.ProfesorResponseDTO;
+import com.example.academia.DTOs.SimpleDTO.CursoSimpleDTO;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
@@ -11,47 +14,44 @@ import java.util.Set;
 
 public interface CursoService {
 
-    Page<CursoEntity> findAll(int page, int size, String sort, String direction);
+    Page<CursoResponseDTO> findAll(int page, int size, String sort, String direction);
 
-    Optional<CursoEntity> findById(Long id);
+    Optional<CursoResponseDTO> findById(Long id);
 
-    List<CursoEntity> findAllLista();
+    Optional<CursoConDetallesDTO> findByIdWithDetails(Long id);
 
-    CursoEntity updateCursoBasicInfo(Long id, CursoEntity cursoNuevo);
+    List<CursoSimpleDTO> findAllLista();
 
-    Page<CursoEntity> findByNombre(String nombre, int page, int size, String sort, String direction);
+    Page<CursoResponseDTO> findByNombre(String nombre, int page, int size, String sort, String direction);
 
-    Page<CursoEntity> findByNivel(CursoEntity.NivelCurso nivel, int page, int size, String sort, String direction);
+    Page<CursoResponseDTO> findByNivel(String nivel, int page, int size, String sort, String direction);
 
-    CursoEntity saveCurso(CursoEntity curso);
+    CursoResponseDTO saveCurso(CursoCreateDTO curso);
+
+    CursoResponseDTO updateCurso(Long id, CursoCreateDTO curso);
 
     void deleteCurso(Long id);
 
     // === GESTIÓN DE Profesores ===
 
-    CursoEntity assignProfesorToCurso(Long cursoId, Long profesorId);
+    CursoResponseDTO assignProfesorToCurso(Long cursoId, Long profesorId);
 
-    CursoEntity removeProfesorFromCurso(Long cursoId, Long profesorId);
+    CursoResponseDTO removeProfesorFromCurso(Long cursoId, Long profesorId);
 
-    Set<ProfesorEntity> getProfesoresByCurso(Long cursoId);
+    Set<ProfesorResponseDTO> getProfesoresByCurso(Long cursoId);
 
-    Page<CursoEntity> findCursosByProfesor(Long profesorId, int page, int size, String sort, String direction);
+    Page<CursoResponseDTO> findCursosByProfesor(Long profesorId, int page, int size, String sort, String direction);
 
     // === GESTIÓN DE alumnos ===
 
-    CursoEntity enrollAlumnoInCurso(Long cursoId, Long alumnoId);
+    CursoResponseDTO enrollAlumnoInCurso(Long cursoId, Long alumnoId);
 
-    CursoEntity unenrollAlumnoFromCurso(Long cursoId, Long alumnoId);
+    CursoResponseDTO unenrollAlumnoFromCurso(Long cursoId, Long alumnoId);
 
-    Set<AlumnoEntity> getAlumnosByCurso(Long cursoId);
+    Set<AlumnoResponseDTO> getAlumnosByCurso(Long cursoId);
 
-    Page<CursoEntity> findCursosByAlumno(Long alumnoId, int page, int size, String sort, String direction);
+    Page<CursoResponseDTO> findCursosByAlumno(Long alumnoId, int page, int size, String sort, String direction);
 
-    // Buscar cursos con plazas disponibles (menos de X alumnos)
-    Page<CursoEntity> findCursosConPlazasDisponibles(int maxAlumnos, int page, int size, String sort, String direction);
-
-    // Obtener estadísticas de un curso (número de profesores y alumnos)
-    CursoEntity getCursoWithDetails(Long cursoId);
-
+    // Buscar cursos con plazas disponibles
+    Page<CursoResponseDTO> findCursosConPlazasDisponibles(int maxAlumnos, int page, int size, String sort, String direction);
 }
-

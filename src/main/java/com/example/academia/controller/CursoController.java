@@ -1,9 +1,12 @@
 package com.example.academia.controller;
 
+import com.example.academia.DTOs.Created.CursoCreateDTO;
+import com.example.academia.DTOs.CursoConDetallesDTO;
+import com.example.academia.DTOs.Response.AlumnoResponseDTO;
+import com.example.academia.DTOs.Response.CursoResponseDTO;
+import com.example.academia.DTOs.Response.ProfesorResponseDTO;
+import com.example.academia.DTOs.SimpleDTO.CursoSimpleDTO;
 import com.example.academia.Exceptions.ValidationException;
-import com.example.academia.entidades.AlumnoEntity;
-import com.example.academia.entidades.CursoEntity;
-import com.example.academia.entidades.ProfesorEntity;
 import com.example.academia.servicios.CursoService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -13,7 +16,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -29,7 +31,7 @@ public class CursoController {
     private final CursoService cursoService;
 
     @GetMapping
-    public ResponseEntity<Page<CursoEntity>> getAllCursos(
+    public ResponseEntity<Page<CursoResponseDTO>> getAllCursos(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
             @RequestParam(defaultValue = "id") String sort,
@@ -39,19 +41,26 @@ public class CursoController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<CursoEntity> getCursoById(@PathVariable Long id) {
+    public ResponseEntity<CursoResponseDTO> getCursoById(@PathVariable Long id) {
         return cursoService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
+    @GetMapping("/{id}/detalles")
+    public ResponseEntity<CursoConDetallesDTO> getCursoWithDetails(@PathVariable Long id) {
+        return cursoService.findByIdWithDetails(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
     @GetMapping("/listar")
-    public ResponseEntity<List<CursoEntity>> getAllCursos() {
+    public ResponseEntity<List<CursoSimpleDTO>> getAllCursos() {
         return ResponseEntity.ok(cursoService.findAllLista());
     }
 
     @GetMapping("/buscar")
-    public ResponseEntity<Page<CursoEntity>> findByNombre(
+    public ResponseEntity<Page<CursoResponseDTO>> findByNombre(
             @RequestParam String nombre,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
@@ -62,7 +71,7 @@ public class CursoController {
     }
 
     @GetMapping("/nivel/{nivel}")
-    public ResponseEntity<Page<CursoEntity>> findByNivel(
+    public ResponseEntity<Page<CursoResponseDTO>> findByNivel(
             @PathVariable String nivel,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
@@ -70,25 +79,24 @@ public class CursoController {
             @RequestParam(defaultValue = "asc") String direction) {
 
         try {
-            CursoEntity.NivelCurso nivelEnum = CursoEntity.NivelCurso.valueOf(nivel);
-            return ResponseEntity.ok(cursoService.findByNivel(nivelEnum, page, size, sort, direction));
-        } catch (IllegalArgumentException e) {
+            return ResponseEntity.ok(cursoService.findByNivel(nivel, page, size, sort, direction));
+        } catch (ValidationException e) {
             return ResponseEntity.badRequest().build();
         }
     }
 
     @PostMapping
-    public ResponseEntity<CursoEntity> createCurso(@RequestBody CursoEntity curso) {
+    public ResponseEntity<CursoResponseDTO> createCurso(@RequestBody CursoCreateDTO curso) {
         return ResponseEntity.status(HttpStatus.CREATED).body(cursoService.saveCurso(curso));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CursoEntity> updateCurso(@PathVariable Long id, @RequestBody CursoEntity curso) {
+    public ResponseEntity<CursoResponseDTO> updateCurso(@PathVariable Long id, @RequestBody CursoCreateDTO curso) {
         try {
-            CursoEntity updated = cursoService.updateCursoBasicInfo(id, curso);
-            return ResponseEntity.ok(updated);
+            CursoResponseDTO updatedCurso = cursoService.updateCurso(id, curso);
+            return ResponseEntity.ok(updatedCurso);
         } catch (ValidationException e) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.badRequest().build();
         }
     }
 
@@ -105,7 +113,7 @@ public class CursoController {
     @PostMapping("/{cursoId}/profesores/{profesorId}")
     public ResponseEntity<?> assignProfesorToCurso(@PathVariable Long cursoId, @PathVariable Long profesorId) {
         try {
-            CursoEntity curso = cursoService.assignProfesorToCurso(cursoId, profesorId);
+            CursoResponseDTO curso = cursoService.assignProfesorToCurso(cursoId, profesorId);
             return ResponseEntity.ok(curso);
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -115,7 +123,7 @@ public class CursoController {
     @DeleteMapping("/{cursoId}/profesores/{profesorId}")
     public ResponseEntity<?> removeProfesorFromCurso(@PathVariable Long cursoId, @PathVariable Long profesorId) {
         try {
-            CursoEntity curso = cursoService.removeProfesorFromCurso(cursoId, profesorId);
+            CursoResponseDTO curso = cursoService.removeProfesorFromCurso(cursoId, profesorId);
             return ResponseEntity.ok(curso);
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -123,24 +131,20 @@ public class CursoController {
     }
 
     @GetMapping("/{cursoId}/profesores")
-    public ResponseEntity<Set<ProfesorEntity>> getProfesoresByCurso(@PathVariable Long cursoId) {
+    public ResponseEntity<Set<ProfesorResponseDTO>> getProfesoresByCurso(@PathVariable Long cursoId) {
         try {
-            Set<ProfesorEntity> profesores = cursoService.getProfesoresByCurso(cursoId);
+            Set<ProfesorResponseDTO> profesores = cursoService.getProfesoresByCurso(cursoId);
             return ResponseEntity.ok(profesores);
         } catch (ValidationException e) {
-            // Manejo específico para ValidationException (curso no encontrado)
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Collections.emptySet());
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
-            // Loguear el error para depuración
             log.error("Error al obtener profesores para el curso ID {}: {}", cursoId, e.getMessage(), e);
-            return ResponseEntity.status(HttpStatus.OK)
-                    .body(Collections.emptySet());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     @GetMapping("/profesor/{profesorId}")
-    public ResponseEntity<Page<CursoEntity>> getCursosByProfesor(
+    public ResponseEntity<Page<CursoResponseDTO>> getCursosByProfesor(
             @PathVariable Long profesorId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
@@ -150,12 +154,10 @@ public class CursoController {
         return ResponseEntity.ok(cursoService.findCursosByProfesor(profesorId, page, size, sort, direction));
     }
 
-
-
     @PostMapping("/{cursoId}/alumnos/{alumnoId}")
     public ResponseEntity<?> enrollAlumnoInCurso(@PathVariable Long cursoId, @PathVariable Long alumnoId) {
         try {
-            CursoEntity curso = cursoService.enrollAlumnoInCurso(cursoId, alumnoId);
+            CursoResponseDTO curso = cursoService.enrollAlumnoInCurso(cursoId, alumnoId);
             return ResponseEntity.ok(curso);
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -165,7 +167,7 @@ public class CursoController {
     @DeleteMapping("/{cursoId}/alumnos/{alumnoId}")
     public ResponseEntity<?> unenrollAlumnoFromCurso(@PathVariable Long cursoId, @PathVariable Long alumnoId) {
         try {
-            CursoEntity curso = cursoService.unenrollAlumnoFromCurso(cursoId, alumnoId);
+            CursoResponseDTO curso = cursoService.unenrollAlumnoFromCurso(cursoId, alumnoId);
             return ResponseEntity.ok(curso);
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -173,9 +175,9 @@ public class CursoController {
     }
 
     @GetMapping("/{cursoId}/alumnos")
-    public ResponseEntity<Set<AlumnoEntity>> getAlumnosByCurso(@PathVariable Long cursoId) {
+    public ResponseEntity<Set<AlumnoResponseDTO>> getAlumnosByCurso(@PathVariable Long cursoId) {
         try {
-            Set<AlumnoEntity> alumnos = cursoService.getAlumnosByCurso(cursoId);
+            Set<AlumnoResponseDTO> alumnos = cursoService.getAlumnosByCurso(cursoId);
             return ResponseEntity.ok(alumnos);
         } catch (ValidationException e) {
             return ResponseEntity.notFound().build();
@@ -183,7 +185,7 @@ public class CursoController {
     }
 
     @GetMapping("/alumno/{alumnoId}")
-    public ResponseEntity<Page<CursoEntity>> getCursosByAlumno(
+    public ResponseEntity<Page<CursoResponseDTO>> getCursosByAlumno(
             @PathVariable Long alumnoId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
@@ -193,10 +195,8 @@ public class CursoController {
         return ResponseEntity.ok(cursoService.findCursosByAlumno(alumnoId, page, size, sort, direction));
     }
 
-    // === ENDPOINTS DE BÚSQUEDA AVANZADA ===
-
     @GetMapping("/con-plazas-disponibles")
-    public ResponseEntity<Page<CursoEntity>> getCursosConPlazasDisponibles(
+    public ResponseEntity<Page<CursoResponseDTO>> getCursosConPlazasDisponibles(
             @RequestParam(defaultValue = "1") int plazasMinimas,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "5") int size,
@@ -206,21 +206,8 @@ public class CursoController {
         return ResponseEntity.ok(cursoService.findCursosConPlazasDisponibles(plazasMinimas, page, size, sort, direction));
     }
 
-    @GetMapping("/{id}/detalles")
-    public ResponseEntity<CursoEntity> getCursoWithDetails(@PathVariable Long id) {
-        try {
-            CursoEntity curso = cursoService.getCursoWithDetails(id);
-            return ResponseEntity.ok(curso);
-        } catch (ValidationException e) {
-            return ResponseEntity.notFound().build();
-        }
-    }
-
-    // === HANDLER DE EXCEPCIONES ===
-
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<Map<String, String>> handleValidationException(ValidationException e) {
         return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
     }
-
 }

@@ -1,36 +1,34 @@
 package com.example.academia.servicios;
 
 import com.example.academia.DTOs.LoginResponse;
+import com.example.academia.DTOs.Response.UsuarioResponseDTO;
 import com.example.academia.DTOs.UsuarioDTO;
-import com.example.academia.entidades.UsuarioEntity;
+import com.example.academia.DTOs.Created.UsuarioCreateDTO;
 
 import java.util.List;
 import java.util.Optional;
 
-
 public interface UsuarioService {
 
+    Optional<UsuarioResponseDTO> findByUsername(String username);
 
-    Optional<UsuarioEntity> findByUsername(String username);
-
-    List<UsuarioEntity> findAll();
+    List<UsuarioResponseDTO> findAll();
 
     LoginResponse login(String username, String password);
 
-    UsuarioEntity saveUsuario(UsuarioEntity usuario);
+    UsuarioResponseDTO saveUsuario(UsuarioDTO usuario);
 
-    UsuarioEntity createUsuario(UsuarioDTO usuarioDTO);
+    UsuarioResponseDTO createUsuario(UsuarioCreateDTO usuarioDTO);
 
-    UsuarioEntity updateUsuario(Long id, UsuarioDTO usuarioDTO);
+    UsuarioResponseDTO updateUsuario(Long id, UsuarioDTO usuarioDTO);
 
     void deleteUsuario(Long id);
 
-    List<UsuarioEntity> findByRol(UsuarioEntity.Rol rol);
+    List<UsuarioResponseDTO> findByRol(String rol);
 
-    Optional<UsuarioEntity> findByProfesorId(Long profesorId);
+    Optional<UsuarioResponseDTO> findByProfesorId(Long profesorId);
 
-    Optional<UsuarioEntity> findByAlumnoId(Long alumnoId);
-    //Intento sincronizar los nombres del usuario con los de la entidad relacionada (profesor o alumno)
-    //No vale de nada que el usuario se llame Antonio pero luego en la tabla
-    UsuarioEntity syncNameWithRelatedEntity(Long usuarioId);
+    Optional<UsuarioResponseDTO> findByAlumnoId(Long alumnoId);
+
+    UsuarioResponseDTO syncNameWithRelatedEntity(Long usuarioId);
 }

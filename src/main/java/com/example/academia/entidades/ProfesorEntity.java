@@ -17,7 +17,7 @@ import java.util.Set;
 @Table(name = "profesores")
 @Data
 @NoArgsConstructor
-@EqualsAndHashCode(exclude = {"usuario", "cursos"})
+@EqualsAndHashCode(exclude = {"usuario", "cursos", "tareasAsignadas", "entregas"})
 @AllArgsConstructor
 public class ProfesorEntity {
 

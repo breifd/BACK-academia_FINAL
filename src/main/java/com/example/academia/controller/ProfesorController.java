@@ -1,11 +1,11 @@
 package com.example.academia.controller;
 
+import com.example.academia.DTOs.Created.ProfesorCreateDTO;
+import com.example.academia.DTOs.Created.UsuarioCreateDTO;
+import com.example.academia.DTOs.Response.ProfesorResponseDTO;
+import com.example.academia.DTOs.SimpleDTO.CursoSimpleDTO;
 import com.example.academia.Exceptions.ValidationException;
-import com.example.academia.entidades.ProfesorEntity;
-import com.example.academia.entidades.UsuarioEntity;
-import com.example.academia.repositorios.UsuarioRepository;
 import com.example.academia.servicios.ProfesorService;
-import com.example.academia.servicios.UsuarioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpStatus;
@@ -22,10 +22,9 @@ import java.util.Map;
 public class ProfesorController {
 
     private final ProfesorService profesorService;
-    private final UsuarioRepository usuarioRepository;
 
     @GetMapping
-    public ResponseEntity<Page<ProfesorEntity>> getAllProfesores(
+    public ResponseEntity<Page<ProfesorResponseDTO>> getAllProfesores(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestParam(defaultValue = "id") String sort,
@@ -35,14 +34,14 @@ public class ProfesorController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ProfesorEntity> getProfesorById(@PathVariable Long id) {
+    public ResponseEntity<ProfesorResponseDTO> getProfesorById(@PathVariable Long id) {
         return profesorService.findById(id)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/buscar")
-    public ResponseEntity<Page<ProfesorEntity>> searchProfesores(
+    public ResponseEntity<Page<ProfesorResponseDTO>> searchProfesores(
             @RequestParam String nombre,
             @RequestParam String apellido,
             @RequestParam(defaultValue = "0") int page,
@@ -50,15 +49,16 @@ public class ProfesorController {
             @RequestParam(defaultValue = "id") String sort,
             @RequestParam(defaultValue = "asc") String direction) {
 
-        return ResponseEntity.ok(profesorService.findByNombreOrApellido(nombre,apellido, page, size, sort, direction));
+        return ResponseEntity.ok(profesorService.findByNombreOrApellido(nombre, apellido, page, size, sort, direction));
     }
+
     @GetMapping("/listar")
-    public ResponseEntity<List<ProfesorEntity>> searchProfesores(){
-       return ResponseEntity.ok(profesorService.findAllLista());
+    public ResponseEntity<List<ProfesorResponseDTO>> getAllProfesores() {
+        return ResponseEntity.ok(profesorService.findAllLista());
     }
 
     @GetMapping("/especialidad/{especialidad}")
-    public ResponseEntity<Page<ProfesorEntity>> getByEspecialidad(
+    public ResponseEntity<Page<ProfesorResponseDTO>> getByEspecialidad(
             @PathVariable String especialidad,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -68,17 +68,28 @@ public class ProfesorController {
         return ResponseEntity.ok(profesorService.findByEspecialidad(especialidad, page, size, sort, direction));
     }
 
+    @GetMapping("/{id}/cursos")
+    public ResponseEntity<Page<CursoSimpleDTO>> getCursosByProfesor(
+            @PathVariable long id,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sort,
+            @RequestParam(defaultValue = "asc") String direction) {
+        return ResponseEntity.ok(profesorService.getCursosByProfesor(id, page, size, sort, direction));
+    }
+
     @PostMapping
-    public ResponseEntity<ProfesorEntity> createProfesor(@RequestBody ProfesorEntity profesor) {
+    public ResponseEntity<ProfesorResponseDTO> createProfesor(@RequestBody ProfesorCreateDTO profesor) {
         return ResponseEntity.status(HttpStatus.CREATED).body(profesorService.saveProfesor(profesor));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ProfesorEntity> updateProfesor(@PathVariable Long id,
-                                                         @RequestBody ProfesorEntity profesor,
-                                                         @RequestParam(defaultValue = "false") boolean syncUsuario) {
-        try{
-            ProfesorEntity profesorActualizado= profesorService.updateProfesor(id, profesor, syncUsuario);
+    public ResponseEntity<ProfesorResponseDTO> updateProfesor(
+            @PathVariable Long id,
+            @RequestBody ProfesorCreateDTO profesor,
+            @RequestParam(defaultValue = "false") boolean syncUsuario) {
+        try {
+            ProfesorResponseDTO profesorActualizado = profesorService.updateProfesor(id, profesor, syncUsuario);
             return ResponseEntity.ok(profesorActualizado);
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(null);
@@ -96,37 +107,9 @@ public class ProfesorController {
     }
 
     @PostMapping("/con-usuario")
-    public ResponseEntity<?> crearwithUser(@RequestBody Map<String, Object> request) {
+    public ResponseEntity<?> crearWithUser(@RequestBody ProfesorCreateDTO profesorDTO) {
         try {
-            // Extraer los datos del profesor
-            ProfesorEntity profesor = new ProfesorEntity();
-            profesor.setNombre((String) request.get("nombre"));
-            profesor.setApellido((String) request.get("apellido"));
-            profesor.setTelefono((String) request.get("telefono"));
-            profesor.setEmail((String) request.get("email"));
-            profesor.setEspecialidad((String) request.get("especialidad"));
-
-            if (request.get("anhosExperiencia") != null) {
-                profesor.setAnhosExperiencia(Integer.valueOf(request.get("anhosExperiencia").toString()));
-            }
-
-            // Extraer los datos del usuario
-            UsuarioEntity usuario = new UsuarioEntity();
-            Map<String, Object> usuarioData = (Map<String, Object>) request.get("usuario");
-            usuario.setUsername((String) usuarioData.get("username"));
-            usuario.setPassword((String) usuarioData.get("password"));
-
-            // Los nombres se copiarán del profesor automáticamente si no se proporcionan
-            if (usuarioData.get("nombre") != null) {
-                usuario.setNombre((String) usuarioData.get("nombre"));
-            }
-            if (usuarioData.get("apellido") != null) {
-                usuario.setApellido((String) usuarioData.get("apellido"));
-            }
-
-            // Crear el profesor con el usuario asociado
-            ProfesorEntity createdProfesor = profesorService.createProfesorWithUser(profesor, usuario);
-
+            ProfesorResponseDTO createdProfesor = profesorService.createProfesorWithUser(profesorDTO);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdProfesor);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));

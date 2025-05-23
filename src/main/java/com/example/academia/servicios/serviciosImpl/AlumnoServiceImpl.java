@@ -1,9 +1,15 @@
 package com.example.academia.servicios.serviciosImpl;
 
+import com.example.academia.DTOs.Created.AlumnoCreateDTO;
+import com.example.academia.DTOs.Created.UsuarioCreateDTO;
+import com.example.academia.DTOs.Response.AlumnoResponseDTO;
+import com.example.academia.DTOs.SimpleDTO.CursoSimpleDTO;
 import com.example.academia.Exceptions.ValidationException;
 import com.example.academia.entidades.AlumnoEntity;
 import com.example.academia.entidades.CursoEntity;
 import com.example.academia.entidades.UsuarioEntity;
+import com.example.academia.mappers.AlumnoMapper;
+import com.example.academia.mappers.CursoMapper;
 import com.example.academia.repositorios.AlumnoRepository;
 import com.example.academia.repositorios.CursoRepository;
 import com.example.academia.repositorios.UsuarioRepository;
@@ -25,6 +31,8 @@ public class AlumnoServiceImpl implements AlumnoService {
     private final UsuarioRepository usuarioRepository;
     private final UsuarioValidator usuarioValidator;
     private final CursoRepository cursoRepository;
+    private final AlumnoMapper alumnoMapper;
+    private final CursoMapper cursoMapper;
 
     private Pageable crearPageable(int page, int size, String sort, String direction) {
         Sort.Direction sortDirection=direction.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
@@ -35,47 +43,50 @@ public class AlumnoServiceImpl implements AlumnoService {
     }
 
     @Override
-    public Page<AlumnoEntity> findAll(int page, int size, String sort, String direction) {
+    public Page<AlumnoResponseDTO> findAll(int page, int size, String sort, String direction) {
         Pageable pageable = crearPageable(page, size, sort, direction);
-        return aRepository.findAll(pageable);
+        return aRepository.findAll(pageable).map(alumnoMapper::toAlumnoResponseDTO);
     }
 
     @Override
-    public Optional<AlumnoEntity> findById(Long id) {
-        return aRepository.findById(id);
+    public Optional<AlumnoResponseDTO> findById(Long id) {
+        return aRepository.findById(id).map(alumnoMapper::toAlumnoResponseDTO);
     }
 
     @Override
-    public Page<AlumnoEntity> findByNombreOrApellido(String nombre, String apellido, int page, int size, String sort, String direction) {
+    public Page<AlumnoResponseDTO> findByNombreOrApellido(String nombre, String apellido, int page, int size, String sort, String direction) {
        Pageable pageable = crearPageable(page, size, sort, direction);
        boolean filtraNombre = nombre != null && !nombre.trim().isEmpty();
        boolean filtraApellido = apellido != null && !apellido.trim().isEmpty();
 
+        Page<AlumnoEntity> alumnosPage;
         if (filtraNombre && filtraApellido) {
-            return aRepository.findByNombreContainingIgnoreCaseAndApellidoContainingIgnoreCase(nombre, apellido, pageable);
+            alumnosPage= aRepository.findByNombreContainingIgnoreCaseAndApellidoContainingIgnoreCase(nombre, apellido, pageable);
         } else if (filtraNombre) {
-            return aRepository.findByNombreContainingIgnoreCase(nombre, pageable);
+            alumnosPage= aRepository.findByNombreContainingIgnoreCase(nombre, pageable);
         } else if (filtraApellido) {
-            return aRepository.findByApellidoContainingIgnoreCase(apellido, pageable);
+            alumnosPage= aRepository.findByApellidoContainingIgnoreCase(apellido, pageable);
         } else {
-            return aRepository.findAll(pageable);
+            alumnosPage= aRepository.findAll(pageable);
         }
+        return alumnosPage.map(alumnoMapper::toAlumnoResponseDTO);
     }
 
     @Override
-    public AlumnoEntity saveAlumno(AlumnoEntity alumno) {
-        return aRepository.save(alumno);
+    public AlumnoResponseDTO saveAlumno(AlumnoCreateDTO alumno) {
+        AlumnoEntity alumnoEntity= alumnoMapper.toAlumnoEntity(alumno);
+        return alumnoMapper.toAlumnoResponseDTO(aRepository.save(alumnoEntity));
     }
 
     @Override
-    public AlumnoEntity updateAlumno(Long id, AlumnoEntity alumno, boolean syncUsuario) {
+    public AlumnoResponseDTO updateAlumno(Long id, AlumnoCreateDTO alumno, boolean syncUsuario) {
        Optional<AlumnoEntity> alumnoEncontrado = aRepository.findById(id);
        if (alumnoEncontrado.isEmpty()) {
            throw new ValidationException("No existe ningun alumno con id " + id);
        }
-
-       alumno.setId(id);
-       AlumnoEntity alumnoActual = aRepository.save(alumno);
+       AlumnoEntity alumnoEntity = alumnoMapper.toAlumnoEntity(alumno);
+       alumnoEntity.setId(id);
+       AlumnoEntity alumnoActual = aRepository.save(alumnoEntity);
 
        if (syncUsuario) {
           Optional<UsuarioEntity> usuarioEncontrado = usuarioRepository.findByAlumnoId(id);
@@ -86,36 +97,40 @@ public class AlumnoServiceImpl implements AlumnoService {
               usuarioRepository.save(usuarioActual);
           }
        }
-       return alumnoActual;
+       return alumnoMapper.toAlumnoResponseDTO(alumnoActual);
     }
 
     @Override
-    public AlumnoEntity createAlumnoWithUser(AlumnoEntity alumno, UsuarioEntity usuario) {
-       //Guardamos el Alumno primero
-        AlumnoEntity alumnoActual = aRepository.save(alumno);
-        //Configuramos el usuario con el alumno guardado
-        usuario.setRol(UsuarioEntity.Rol.Alumno);
-        usuario.setAlumno(alumnoActual);
+    public AlumnoResponseDTO createAlumnoWithUser(AlumnoCreateDTO alumnoDTO) {
+        AlumnoEntity alumnoE = alumnoMapper.toAlumnoEntity(alumnoDTO);
+        AlumnoEntity alumnoActual = aRepository.save(alumnoE);
 
-        if (usuario.getNombre() == null || usuario.getNombre().isEmpty()) {
-            usuario.setNombre(alumno.getNombre());
+        // Solo creamos usuario si se incluye en el DTO
+        if (alumnoDTO.getUsuario() != null) {
+            UsuarioCreateDTO usuarioDTO = alumnoDTO.getUsuario();
+
+            UsuarioEntity usuario = new UsuarioEntity();
+            usuario.setUsername(usuarioDTO.getUsername());
+            usuario.setPassword(usuarioDTO.getPassword());
+            usuario.setRol(UsuarioEntity.Rol.Alumno);
+            usuario.setAlumno(alumnoActual);
+
+            // Copiar nombre/apellido del alumno si no están definidos en el usuario
+            usuario.setNombre(usuarioDTO.getNombre() != null ? usuarioDTO.getNombre() : alumnoDTO.getNombre());
+            usuario.setApellido(usuarioDTO.getApellido() != null ? usuarioDTO.getApellido() : alumnoDTO.getApellido());
+
+            usuarioValidator.validateRolRelations(usuario);
+            usuarioRepository.save(usuario);
         }
-        if (usuario.getApellido() == null || usuario.getApellido().isEmpty()) {
-            usuario.setApellido(alumno.getApellido());
-        }
 
-        usuarioValidator.validateRolRelations(usuario);
-        // Guardar el usuario
-        usuarioRepository.save(usuario);
-
-        return alumnoActual;
+        return alumnoMapper.toAlumnoResponseDTO(alumnoActual);
     }
 
     @Override
-    public Page<CursoEntity> getCursosByAlumno(Long alumnoId, int page, int size, String sort, String direction) {
+    public Page<CursoSimpleDTO> getCursosByAlumno(Long alumnoId, int page, int size, String sort, String direction) {
         Pageable pageable = crearPageable(page, size, sort, direction);
         AlumnoEntity alumno = aRepository.findById(alumnoId).orElseThrow(()-> new ValidationException("No existe ningun alumno con id " + alumnoId));
-        return cursoRepository.findByAlumnosId(alumnoId,pageable);
+        return cursoRepository.findByAlumnosId(alumnoId,pageable).map(cursoMapper::toCursoSimpleDTO);
     }
 
     @Override

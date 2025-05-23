@@ -7,6 +7,8 @@ import com.example.academia.DTOs.SimpleDTO.AlumnoSimpleDTO;
 import com.example.academia.entidades.AlumnoEntity;
 import org.mapstruct.*;
 
+import java.util.List;
+
 @Mapper(componentModel = "spring")
 public interface AlumnoMapper {
 
@@ -16,4 +18,13 @@ public interface AlumnoMapper {
     AlumnoEntity toAlumnoEntity(AlumnoCreateDTO dto);
 
     AlumnoSimpleDTO toAlumnoSimpleDTO(AlumnoEntity alumno);
+
+    @Mapping(target = "usuario", ignore = true)
+    @Mapping(target = "cursos", ignore = true)
+    @Mapping(target = "tareasAsignadas", ignore = true)
+    @Mapping(target = "entregas", ignore = true)
+    void updateAlumnoFromDTO(AlumnoResponseDTO dto, @MappingTarget AlumnoEntity alumno);
+
+    List<AlumnoResponseDTO> toAlumnoResponseDTOList(List<AlumnoEntity> alumnos);
+    List<AlumnoSimpleDTO> toAlumnoSimpleDTOList(List<AlumnoEntity> alumnos);
 }

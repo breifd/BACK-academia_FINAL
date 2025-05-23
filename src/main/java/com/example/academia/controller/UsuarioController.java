@@ -1,21 +1,20 @@
 package com.example.academia.controller;
 
-
+import com.example.academia.DTOs.Created.UsuarioCreateDTO;
 import com.example.academia.DTOs.LoginResponse;
+import com.example.academia.DTOs.Response.UsuarioResponseDTO;
 import com.example.academia.DTOs.UsuarioDTO;
 import com.example.academia.Exceptions.ValidationException;
 import com.example.academia.entidades.UsuarioEntity;
 import com.example.academia.repositorios.UsuarioRepository;
 import com.example.academia.servicios.UsuarioService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * Controlador que maneja las peticiones relacionadas con los usuarios
@@ -27,7 +26,6 @@ import java.util.Optional;
 public class UsuarioController {
 
     private final UsuarioService usuarioService;
-
     private final UsuarioRepository usuarioRepository;
 
     @PostMapping("/login")
@@ -45,29 +43,28 @@ public class UsuarioController {
             return ResponseEntity.badRequest().body(loginResponse);
         }
     }
+
     @GetMapping("/usuario/{username}")
     public ResponseEntity<?> getUsuario(@PathVariable String username) {
-        Optional<UsuarioEntity> usuario = usuarioService.findByUsername(username);
-        if (usuario.isPresent()) {
-            return ResponseEntity.ok(usuario.get());
-        }
-        return ResponseEntity.notFound().build();
+        return usuarioService.findByUsername(username)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/usuarios")
-    public ResponseEntity<List<UsuarioEntity>> getAllUsuarios() {
+    public ResponseEntity<List<UsuarioResponseDTO>> getAllUsuarios() {
         return ResponseEntity.ok(usuarioService.findAll());
     }
 
     @GetMapping("/usuarios/rol/{rol}")
-    public ResponseEntity<List<UsuarioEntity>> getUsuariosByRol(@PathVariable UsuarioEntity.Rol rol) {
+    public ResponseEntity<List<UsuarioResponseDTO>> getUsuariosByRol(@PathVariable String rol) {
         return ResponseEntity.ok(usuarioService.findByRol(rol));
     }
 
     @PostMapping("/usuarios")
-    public ResponseEntity<?> createUsuario(@RequestBody UsuarioDTO usuarioDTO) {
+    public ResponseEntity<?> createUsuario(@RequestBody UsuarioCreateDTO usuarioDTO) {
         try {
-            UsuarioEntity newUsuario = usuarioService.createUsuario(usuarioDTO);
+            UsuarioResponseDTO newUsuario = usuarioService.createUsuario(usuarioDTO);
             return ResponseEntity.status(HttpStatus.CREATED).body(newUsuario);
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -77,7 +74,7 @@ public class UsuarioController {
     @PutMapping("/usuarios/{id}")
     public ResponseEntity<?> updateUsuario(@PathVariable Long id, @RequestBody UsuarioDTO usuarioDTO) {
         try {
-            UsuarioEntity updatedUsuario = usuarioService.updateUsuario(id, usuarioDTO);
+            UsuarioResponseDTO updatedUsuario = usuarioService.updateUsuario(id, usuarioDTO);
             return ResponseEntity.ok(updatedUsuario);
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -87,7 +84,7 @@ public class UsuarioController {
     @PutMapping("/usuarios/{id}/sync-name")
     public ResponseEntity<?> syncUsuarioName(@PathVariable Long id) {
         try {
-            UsuarioEntity syncedUsuario = usuarioService.syncNameWithRelatedEntity(id);
+            UsuarioResponseDTO syncedUsuario = usuarioService.syncNameWithRelatedEntity(id);
             return ResponseEntity.ok(syncedUsuario);
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -102,50 +99,18 @@ public class UsuarioController {
 
     @GetMapping("/usuarios/profesor/{profesorId}")
     public ResponseEntity<?> getUsuarioByProfesorId(@PathVariable Long profesorId) {
-       try {
-           Optional<UsuarioEntity> usuario = usuarioService.findByProfesorId(profesorId);
-           if (usuario.isPresent()) {
-               UsuarioEntity u = usuario.get();
-               UsuarioDTO usuarioDTO = new UsuarioDTO();
-               usuarioDTO.setId(u.getId());
-               usuarioDTO.setUsername(u.getUsername());
-               usuarioDTO.setNombre(u.getNombre());
-               usuarioDTO.setApellido(u.getApellido());
-               usuarioDTO.setRol(u.getRol());
-               usuarioDTO.setProfesorId(profesorId);
-
-               return ResponseEntity.ok(usuarioDTO);
-           }
-           return ResponseEntity.notFound().build();
-       }catch (Exception e) {
-           return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
-       }
+        return usuarioService.findByProfesorId(profesorId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/usuarios/alumno/{alumnoId}")
     public ResponseEntity<?> getUsuarioByAlumnoId(@PathVariable Long alumnoId) {
-        try {
-            Optional<UsuarioEntity> u = usuarioService.findByAlumnoId(alumnoId);
-            if (u.isPresent()) {
-                UsuarioEntity usuario = u.get();
-
-                // Crear y llenar el DTO
-                UsuarioDTO usuarioDTO = new UsuarioDTO();
-                usuarioDTO.setId(usuario.getId());
-                usuarioDTO.setUsername(usuario.getUsername());
-                usuarioDTO.setNombre(usuario.getNombre());
-                usuarioDTO.setApellido(usuario.getApellido());
-                usuarioDTO.setRol(usuario.getRol());
-                usuarioDTO.setAlumnoId(alumnoId);
-
-                return ResponseEntity.ok(usuarioDTO);
-            }
-            return ResponseEntity.notFound().build();
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
-        }
+        return usuarioService.findByAlumnoId(alumnoId)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
+
     @GetMapping("/check-username/{username}")
     public ResponseEntity<Boolean> checkUsernameExists(@PathVariable String username) {
         boolean exists = usuarioRepository.existsByUsername(username);

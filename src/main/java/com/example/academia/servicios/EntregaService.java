@@ -2,7 +2,9 @@ package com.example.academia.servicios;
 
 import com.example.academia.DTOs.CalificacionDTO;
 import com.example.academia.DTOs.DocumentoDTO;
-import com.example.academia.DTOs.EntregaRequestDTO;
+import com.example.academia.DTOs.Created.EntregaCreateDTO;
+import com.example.academia.DTOs.Response.EntregaResponseDTO;
+import com.example.academia.DTOs.SimpleDTO.EntregaSimpleDTO;
 import com.example.academia.entidades.EntregaEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.web.multipart.MultipartFile;
@@ -12,13 +14,13 @@ import java.util.Optional;
 
 public interface EntregaService {
     // Obtener todas las entregas (paginadas)
-    Page<EntregaEntity> findAll(int page, int size, String sort, String direction);
+    Page<EntregaResponseDTO> findAll(int page, int size, String sort, String direction);
 
     // Obtener una entrega por su ID
-    Optional<EntregaEntity> findById(Long id);
+    Optional<EntregaResponseDTO> findById(Long id);
 
     // Guardar una entrega
-    EntregaEntity saveEntrega(EntregaEntity entrega);
+    EntregaResponseDTO saveEntrega(EntregaCreateDTO entrega);
 
     // Eliminar una entrega
     void deleteEntrega(Long id);
@@ -26,27 +28,27 @@ public interface EntregaService {
     // -- Operaciones de búsqueda -- //
 
     // Buscar entregas por tarea
-    Page<EntregaEntity> findByTarea(Long tareaId, int page, int size, String sort, String direction);
+    Page<EntregaResponseDTO> findByTarea(Long tareaId, int page, int size, String sort, String direction);
 
     // Buscar entregas por alumno
-    Page<EntregaEntity> findByAlumno(Long alumnoId, int page, int size, String sort, String direction);
+    Page<EntregaResponseDTO> findByAlumno(Long alumnoId, int page, int size, String sort, String direction);
 
     // Buscar entrega específica por tarea y alumno
-    Optional<EntregaEntity> findByTareaAndAlumno(Long tareaId, Long alumnoId);
+    Optional<EntregaResponseDTO> findByTareaAndAlumno(Long tareaId, Long alumnoId);
 
     // Buscar entregas por estado
-    Page<EntregaEntity> findByEstado(EntregaEntity.EstadoEntrega estado, int page, int size, String sort, String direction);
+    Page<EntregaResponseDTO> findByEstado(String estado, int page, int size, String sort, String direction);
 
     // Buscar entregas pendientes de calificación para un profesor
-    Page<EntregaEntity> findEntregasPendientesCalificacion(Long profesorId, int page, int size, String sort, String direction);
+    Page<EntregaResponseDTO> findEntregasPendientesCalificacion(Long profesorId, int page, int size, String sort, String direction);
 
     // -- Operaciones específicas de negocio -- //
 
     // Crear una nueva entrega
-    EntregaEntity crearEntrega(EntregaRequestDTO entregaDTO, Long alumnoId);
+    EntregaResponseDTO crearEntrega(EntregaCreateDTO entregaDTO, Long alumnoId);
 
     // Calificar una entrega
-    EntregaEntity calificarEntrega(Long entregaId, CalificacionDTO calificacionDTO, Long profesorId);
+    EntregaResponseDTO calificarEntrega(Long entregaId, CalificacionDTO calificacionDTO, Long profesorId);
 
     // -- Estadísticas -- //
 
@@ -59,7 +61,7 @@ public interface EntregaService {
     // -- Operaciones de documentos -- //
 
     // Subir documento para una entrega
-    EntregaEntity uploadDocumento(Long entregaId, MultipartFile file, Long alumnoId) throws IOException;
+    EntregaResponseDTO uploadDocumento(Long entregaId, MultipartFile file, Long alumnoId) throws IOException;
 
     // Descargar documento de una entrega
     DocumentoDTO downloadDocumento(Long entregaId);

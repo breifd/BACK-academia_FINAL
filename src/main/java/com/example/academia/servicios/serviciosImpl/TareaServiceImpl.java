@@ -1,12 +1,16 @@
 package com.example.academia.servicios.serviciosImpl;
 
 import com.example.academia.DTOs.DocumentoDTO;
+import com.example.academia.DTOs.Response.TareaResponseDTO;
+import com.example.academia.DTOs.SimpleDTO.TareaSimpleDTO;
 import com.example.academia.DTOs.TareaDTO;
 import com.example.academia.Exceptions.ValidationException;
 import com.example.academia.entidades.AlumnoEntity;
 import com.example.academia.entidades.CursoEntity;
 import com.example.academia.entidades.ProfesorEntity;
 import com.example.academia.entidades.TareaEntity;
+import com.example.academia.mappers.DocumentoMapper;
+import com.example.academia.mappers.TareaMapper;
 import com.example.academia.repositorios.AlumnoRepository;
 import com.example.academia.repositorios.CursoRepository;
 import com.example.academia.repositorios.ProfesorRepository;
@@ -37,94 +41,113 @@ public class TareaServiceImpl implements TareaService {
     private final ProfesorRepository profesorRepository;
     private final AlumnoRepository alumnoRepository;
     private final CursoRepository cursoRepository;
+    private final TareaMapper tareaMapper;
+    private final DocumentoMapper documentoMapper;
 
     private Pageable createPageable(int page, int size, String sort, String direction) {
-        Sort.Direction sortDirection=direction.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
-        if(sort==null || sort.isEmpty()) sort="id";
-
-        return PageRequest.of(page, size, sortDirection , sort);
+        Sort.Direction sortDirection = direction.equalsIgnoreCase("asc") ? Sort.Direction.ASC : Sort.Direction.DESC;
+        if (sort == null || sort.isEmpty()) sort = "id";
+        return PageRequest.of(page, size, sortDirection, sort);
     }
+
     @Override
-    public Page<TareaEntity> findAll(int page, int size, String sort, String direction) {
+    public Page<TareaResponseDTO> findAll(int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
-        return tareaRepository.findAll(pageable);
+        return tareaRepository.findAll(pageable).map(tareaMapper::toTareaResponseDTO);
     }
 
     @Override
-    public Optional<TareaEntity> findById(Long id) {
-        return tareaRepository.findById(id);
+    public Optional<TareaResponseDTO> findById(Long id) {
+        return tareaRepository.findById(id).map(tareaMapper::toTareaResponseDTO);
     }
 
     @Override
-    public List<TareaEntity> findAllLista() {
-        return tareaRepository.findAll();
+    public List<TareaSimpleDTO> findAllLista() {
+        return tareaRepository.findAll().stream()
+                .map(tareaMapper::toTareaSimpleDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public Page<TareaEntity> findByNombre(String nombre, int page, int size, String sort, String direction) {
+    public Page<TareaResponseDTO> findByNombre(String nombre, int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
         if (nombre != null && !nombre.trim().isEmpty()) {
-            return tareaRepository.findByNombreContainingIgnoreCase(nombre, pageable);
+            return tareaRepository.findByNombreContainingIgnoreCase(nombre, pageable)
+                    .map(tareaMapper::toTareaResponseDTO);
         } else {
-            return tareaRepository.findAll(pageable);
+            return tareaRepository.findAll(pageable).map(tareaMapper::toTareaResponseDTO);
         }
     }
 
     @Override
-    public Page<TareaEntity> findByFechaLimiteAntes(LocalDate fecha, int page, int size, String sort, String direction) {
+    public Page<TareaResponseDTO> findByFechaLimiteAntes(LocalDate fecha, int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
-        return tareaRepository.findByFechaLimiteBefore(fecha, pageable);
+        return tareaRepository.findByFechaLimiteBefore(fecha, pageable)
+                .map(tareaMapper::toTareaResponseDTO);
     }
 
     @Override
-    public Page<TareaEntity> findByFechaLimiteDespues(LocalDate fecha, int page, int size, String sort, String direction) {
+    public Page<TareaResponseDTO> findByFechaLimiteDespues(LocalDate fecha, int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
-        return tareaRepository.findByFechaLimiteAfter(fecha, pageable);
+        return tareaRepository.findByFechaLimiteAfter(fecha, pageable)
+                .map(tareaMapper::toTareaResponseDTO);
     }
 
     @Override
-    public TareaEntity saveTarea(TareaEntity tarea) {
-        validarFechas(tarea);
-        return tareaRepository.save(tarea);
+    public TareaResponseDTO saveTarea(TareaDTO tarea) {
+        TareaEntity tareaEntity = tareaMapper.toTareaEntity(tarea);
+        validarFechas(tareaEntity);
+
+        // Si tiene ID, es una actualización y necesitamos mantener el documento existente
+        if (tarea.getId() != null) {
+            Optional<TareaEntity> tareaExistente = tareaRepository.findById(tarea.getId());
+            if (tareaExistente.isPresent() && tareaExistente.get().getDocumento() != null) {
+                tareaEntity.setDocumento(tareaExistente.get().getDocumento());
+                tareaEntity.setNombreDocumento(tareaExistente.get().getNombreDocumento());
+                tareaEntity.setTipoDocumento(tareaExistente.get().getTipoDocumento());
+            }
+        }
+
+        TareaEntity savedTarea = tareaRepository.save(tareaEntity);
+        return tareaMapper.toTareaResponseDTO(savedTarea);
     }
 
-    private void validarFechas(TareaEntity tarea){
+    private void validarFechas(TareaEntity tarea) {
         if (tarea.getFechaPublicacion() != null && tarea.getFechaLimite() != null) {
             if (tarea.getFechaLimite().isBefore(tarea.getFechaPublicacion())) {
-                throw new IllegalArgumentException("La fecha límite no puede ser anterior a la fecha de publicación");
+                throw new ValidationException("La fecha límite no puede ser anterior a la fecha de publicación");
             }
         }
     }
 
     @Override
     @Transactional
-    public TareaEntity uploadDocumento(Long tareaId, MultipartFile file) throws IOException {
-        Optional<TareaEntity> tareaEntity = tareaRepository.findById(tareaId);
+    public TareaResponseDTO uploadDocumento(Long tareaId, MultipartFile file) throws IOException {
+        TareaEntity tarea = tareaRepository.findById(tareaId)
+                .orElseThrow(() -> new ValidationException("Tarea no encontrada con ID: " + tareaId));
 
-        if(tareaEntity.isPresent()) {
-            TareaEntity tarea = tareaEntity.get();
-            tarea.setDocumento(file.getBytes());
-            tarea.setNombreDocumento(file.getOriginalFilename());
-            tarea.setTipoDocumento(file.getContentType());
+        tarea.setDocumento(file.getBytes());
+        tarea.setNombreDocumento(file.getOriginalFilename());
+        tarea.setTipoDocumento(file.getContentType());
 
-            return tareaRepository.save(tarea);
-        }
-        else {
-        throw new RuntimeException("Tarea no encontrada con ID: " + tareaId);
-        }
-
+        TareaEntity savedTarea = tareaRepository.save(tarea);
+        return tareaMapper.toTareaResponseDTO(savedTarea);
     }
 
     @Override
     public DocumentoDTO downloadDocumento(Long tareaId) {
-        Optional<TareaEntity> tareaEntity = tareaRepository.findById(tareaId);
+        TareaEntity tarea = tareaRepository.findById(tareaId)
+                .orElseThrow(() -> new ValidationException("Tarea no encontrada con ID: " + tareaId));
 
-        if(tareaEntity.isPresent() && tareaEntity.get().getDocumento().length > 0 && tareaEntity.get().getDocumento()!=null) {
-            return new DocumentoDTO(tareaEntity.get().getNombreDocumento(), tareaEntity.get().getTipoDocumento(), tareaEntity.get().getDocumento());
+        if (tarea.getDocumento() == null || tarea.getDocumento().length == 0) {
+            throw new ValidationException("La tarea no tiene documento");
         }
-        else{
-            throw new RuntimeException("Tarea no encontrada con ID o no existe documento en esa tarea: " + tareaId);
-        }
+
+        return documentoMapper.toDocumentoDTO(
+                tarea.getNombreDocumento(),
+                tarea.getTipoDocumento(),
+                tarea.getDocumento()
+        );
     }
 
     @Override
@@ -133,69 +156,81 @@ public class TareaServiceImpl implements TareaService {
     }
 
     @Override
-    public Page<TareaEntity> findTareasProfesor(Long profesorId, int page, int size, String sort, String direction) {
+    public Page<TareaResponseDTO> findTareasProfesor(Long profesorId, int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
-        return tareaRepository.findByProfesorId(profesorId, pageable);
+        return tareaRepository.findByProfesorId(profesorId, pageable)
+                .map(tareaMapper::toTareaResponseDTO);
     }
 
     @Override
-    public Page<TareaEntity> findTareasCurso(Long cursoId, int page, int size, String sort, String direction) {
+    public Page<TareaResponseDTO> findTareasCurso(Long cursoId, int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
-        return tareaRepository.findByCursoId(cursoId, pageable);
+        return tareaRepository.findByCursoId(cursoId, pageable)
+                .map(tareaMapper::toTareaResponseDTO);
     }
 
     @Override
-    public Page<TareaEntity> findTareasAlumno(Long alumnoId, int page, int size, String sort, String direction) {
+    public Page<TareaResponseDTO> findTareasAlumno(Long alumnoId, int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
-        return tareaRepository.findTareasForAlumno(alumnoId, pageable);
+        return tareaRepository.findTareasForAlumno(alumnoId, pageable)
+                .map(tareaMapper::toTareaResponseDTO);
     }
 
     @Override
-    public List<TareaEntity> findTareasByCursoForAlumno(Long cursoId, Long alumnoId) {
-        return tareaRepository.findTareasByCursoForAlumno(cursoId, alumnoId);
+    public List<TareaResponseDTO> findTareasByCursoForAlumno(Long cursoId, Long alumnoId) {
+        return tareaRepository.findTareasByCursoForAlumno(cursoId, alumnoId).stream()
+                .map(tareaMapper::toTareaResponseDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
     @Transactional
-    public TareaEntity createTarea(TareaDTO tareaDTO, Long profesorId) {
-        ProfesorEntity profesor = profesorRepository.findById(profesorId).orElseThrow(() -> new ValidationException("Profesor no encontrado con ID: " + profesorId));
-        CursoEntity curso = cursoRepository.findById(tareaDTO.getCursoId()).orElseThrow(() -> new ValidationException("Curso no encontrado con ID: " + tareaDTO.getCursoId()));
-        //1º Comprobar si el profesor está en el curso
-        boolean profesorEnCurso = curso.getProfesores().stream().anyMatch(profesor1 -> profesor1.getId().equals(profesorId));
+    public TareaResponseDTO createTarea(TareaDTO tareaDTO, Long profesorId) {
+        ProfesorEntity profesor = profesorRepository.findById(profesorId)
+                .orElseThrow(() -> new ValidationException("Profesor no encontrado con ID: " + profesorId));
+
+        CursoEntity curso = cursoRepository.findById(tareaDTO.getCursoId())
+                .orElseThrow(() -> new ValidationException("Curso no encontrado con ID: " + tareaDTO.getCursoId()));
+
+        // Comprobar si el profesor está en el curso
+        boolean profesorEnCurso = curso.getProfesores().stream()
+                .anyMatch(p -> p.getId().equals(profesorId));
+
         if (!profesorEnCurso) {
-            throw new ValidationException("Profesor no encontrado en el curso");
+            throw new ValidationException("El profesor no imparte en este curso");
         }
 
-        //Creamos la tarea con los datos del dto demas
-        TareaEntity tarea = new TareaEntity();
-        tarea.setNombre(tareaDTO.getNombre());
-        tarea.setDescripcion(tareaDTO.getDescripcion());
+        // Crear la tarea
+        TareaEntity tarea = tareaMapper.toTareaEntity(tareaDTO);
+        tarea.setProfesor(profesor);
+        tarea.setCurso(curso);
         tarea.setFechaPublicacion(tareaDTO.getFechaPublicacion() != null ?
                 tareaDTO.getFechaPublicacion() : LocalDate.now());
-        tarea.setFechaLimite(tareaDTO.getFechaLimite());
-        tarea.setCurso(curso);
-        tarea.setProfesor(profesor);
-        tarea.setParaTodosLosAlumnos(tareaDTO.getParaTodosLosAlumnos());
 
         validarFechas(tarea);
 
-        //Ahora si la tarea no es para todos tenemos que encontrar los alumnos a los que se les asigna la tarea
-        if (Boolean.FALSE.equals(tareaDTO.getParaTodosLosAlumnos()) && tareaDTO.getAlumnosIds() != null && !tareaDTO.getAlumnosIds().isEmpty()) {
+        // Si la tarea no es para todos, asignar alumnos específicos
+        if (Boolean.FALSE.equals(tareaDTO.getParaTodosLosAlumnos()) &&
+                tareaDTO.getAlumnosIds() != null && !tareaDTO.getAlumnosIds().isEmpty()) {
+
             Set<AlumnoEntity> alumnosAsignados = new HashSet<>();
             for (Long alumnoId : tareaDTO.getAlumnosIds()) {
-                //Verificamos que el alumno existe y está en el curso
-                AlumnoEntity alumno = alumnoRepository.findById(alumnoId).orElseThrow(()-> new ValidationException("Alumno no encontrado con ID: " + alumnoId));
+                AlumnoEntity alumno = alumnoRepository.findById(alumnoId)
+                        .orElseThrow(() -> new ValidationException("Alumno no encontrado con ID: " + alumnoId));
 
-                if(!validarAlumnoCurso(alumnoId,curso.getId())) {
-                    throw new ValidationException("Alumno no matriculado en el curso");
+                if (!validarAlumnoCurso(alumnoId, curso.getId())) {
+                    throw new ValidationException("El alumno con ID " + alumnoId + " no está matriculado en el curso");
                 }
+
                 alumnosAsignados.add(alumno);
             }
+
             tarea.setAlumnosAsignados(alumnosAsignados);
         }
-        return tareaRepository.save(tarea);
-    }
 
+        TareaEntity savedTarea = tareaRepository.save(tarea);
+        return tareaMapper.toTareaResponseDTO(savedTarea);
+    }
 
     @Override
     public boolean canProfesorAssignTareaToAlumnoInCurso(Long profesorId, Long alumnoId, Long cursoId) {
@@ -204,21 +239,21 @@ public class TareaServiceImpl implements TareaService {
 
     @Override
     @Transactional
-    public TareaEntity asignarTareaAAlumno(Long tareaId, Long alumnoId) {
-        TareaEntity tarea = tareaRepository.findById(tareaId).orElseThrow(() -> new ValidationException("Tarea no encontrada con ID: " + tareaId));
+    public TareaResponseDTO asignarTareaAAlumno(Long tareaId, Long alumnoId) {
+        TareaEntity tarea = tareaRepository.findById(tareaId)
+                .orElseThrow(() -> new ValidationException("Tarea no encontrada con ID: " + tareaId));
 
-        AlumnoEntity alumno = alumnoRepository.findById(alumnoId).orElseThrow(() -> new ValidationException("Alumno no encontrado con ID: " + alumnoId));
+        AlumnoEntity alumno = alumnoRepository.findById(alumnoId)
+                .orElseThrow(() -> new ValidationException("Alumno no encontrado con ID: " + alumnoId));
 
         if (!validarAlumnoCurso(alumnoId, tarea.getCurso().getId())) {
             throw new ValidationException("El alumno no está matriculado en el curso de esta tarea");
         }
 
-        // Si la tarea ya es para todos, no tiene sentido asignarla a un alumno específico
         if (Boolean.TRUE.equals(tarea.getParaTodosLosAlumnos())) {
             throw new ValidationException("Esta tarea ya está asignada a todos los alumnos del curso");
         }
 
-        // Verificar si ya está asignado
         boolean yaAsignado = tarea.getAlumnosAsignados().stream()
                 .anyMatch(a -> a.getId().equals(alumnoId));
 
@@ -226,29 +261,36 @@ public class TareaServiceImpl implements TareaService {
             throw new ValidationException("El alumno ya tiene asignada esta tarea");
         }
 
-        // Añadir al alumno a la lista de asignados
         tarea.getAlumnosAsignados().add(alumno);
-        return tareaRepository.save(tarea);
+        TareaEntity savedTarea = tareaRepository.save(tarea);
+
+        return tareaMapper.toTareaResponseDTO(savedTarea);
     }
 
     @Override
     @Transactional
-    public TareaEntity desasignarTareaDeAlumno(Long tareaId, Long alumnoId) {
-       TareaEntity tarea = tareaRepository.findById(tareaId).orElseThrow(()-> new ValidationException("Tarea no encontrado con ID: " + tareaId));
-       if(Boolean.TRUE.equals(tarea.getParaTodosLosAlumnos())){
-           throw new ValidationException("Tarea asignada para todos los alumnos imposible desasignar");
-       }
-       //Comprobamos si existe algun alumno con ese id a la tarea
-       boolean estaAsignado = tarea.getAlumnosAsignados().stream().anyMatch(alumno -> alumno.getId().equals(alumnoId));
-       if(!estaAsignado){
-           throw new ValidationException("El alumno no tiene asignada ninguna tarea");
-       }
-       //si existe actualizamos los Alumnos Asignados, filtramos  por todos los alumnos con un id distinto
-        //nos devuelve una lista de alumnos sin el que tiene el id, guardamos y ya tenemos desasignado el alumno de la tarea
-       tarea.setAlumnosAsignados(tarea.getAlumnosAsignados().stream()
-                                .filter(alumno -> !alumno.getId().equals(alumnoId))
-                                .collect(Collectors.toSet()));
-       return tareaRepository.save(tarea);
+    public TareaResponseDTO desasignarTareaDeAlumno(Long tareaId, Long alumnoId) {
+        TareaEntity tarea = tareaRepository.findById(tareaId)
+                .orElseThrow(() -> new ValidationException("Tarea no encontrada con ID: " + tareaId));
+
+        if (Boolean.TRUE.equals(tarea.getParaTodosLosAlumnos())) {
+            throw new ValidationException("No se puede desasignar a un alumno de una tarea asignada a todos");
+        }
+
+        boolean estaAsignado = tarea.getAlumnosAsignados().stream()
+                .anyMatch(alumno -> alumno.getId().equals(alumnoId));
+
+        if (!estaAsignado) {
+            throw new ValidationException("El alumno no tiene asignada esta tarea");
+        }
+
+        tarea.setAlumnosAsignados(tarea.getAlumnosAsignados().stream()
+                .filter(alumno -> !alumno.getId().equals(alumnoId))
+                .collect(Collectors.toSet()));
+
+        TareaEntity savedTarea = tareaRepository.save(tarea);
+
+        return tareaMapper.toTareaResponseDTO(savedTarea);
     }
 
     @Override
@@ -259,11 +301,12 @@ public class TareaServiceImpl implements TareaService {
 
     @Override
     public boolean validarAlumnoCurso(Long alumnoId, Long cursoId) {
-        Optional<CursoEntity> curso= cursoRepository.findById(cursoId);
-        if(curso.isEmpty()){return false;}
-        CursoEntity cursoEntity = curso.get();
-        //Si algun alumno con id X está en el curso seleccionado devuelve true sino False
-        return cursoEntity.getAlumnos().stream().
-                                        anyMatch(alumno -> alumno.getId().equals(alumnoId));
+        Optional<CursoEntity> curso = cursoRepository.findById(cursoId);
+        if (curso.isEmpty()) {
+            return false;
+        }
+
+        return curso.get().getAlumnos().stream()
+                .anyMatch(alumno -> alumno.getId().equals(alumnoId));
     }
 }

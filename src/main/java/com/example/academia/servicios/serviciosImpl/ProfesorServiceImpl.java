@@ -1,8 +1,16 @@
 package com.example.academia.servicios.serviciosImpl;
 
+import com.example.academia.DTOs.Created.ProfesorCreateDTO;
+import com.example.academia.DTOs.Created.UsuarioCreateDTO;
+import com.example.academia.DTOs.Response.ProfesorResponseDTO;
+import com.example.academia.DTOs.SimpleDTO.CursoSimpleDTO;
 import com.example.academia.Exceptions.ValidationException;
+import com.example.academia.entidades.CursoEntity;
 import com.example.academia.entidades.ProfesorEntity;
 import com.example.academia.entidades.UsuarioEntity;
+import com.example.academia.mappers.CursoMapper;
+import com.example.academia.mappers.ProfesorMapper;
+import com.example.academia.repositorios.CursoRepository;
 import com.example.academia.repositorios.ProfesorRepository;
 import com.example.academia.repositorios.UsuarioRepository;
 import com.example.academia.servicios.ProfesorService;
@@ -16,75 +24,85 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public  class ProfesorServiceImpl implements ProfesorService {
+public class ProfesorServiceImpl implements ProfesorService {
 
     private final ProfesorRepository profesorRepository;
     private final UsuarioRepository usuarioRepository;
     private final UsuarioValidator usuarioValidator;
-
+    private final CursoRepository cursoRepository;
+    private final ProfesorMapper profesorMapper;
+    private final CursoMapper cursoMapper;
 
     private Pageable createPageable(int page, int size, String sort, String direction) {
         Sort.Direction sortDirection = direction.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
         if (sort == null || sort.isEmpty()) {
-            sort = "id";  // O cualquier campo predeterminado de tu entidad
+            sort = "id";
         }
         return PageRequest.of(page, size, sortDirection, sort);
     }
 
     @Override
-    public Page<ProfesorEntity> findAll(int page, int size, String sort, String direction) {
+    public Page<ProfesorResponseDTO> findAll(int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
-        return profesorRepository.findAll(pageable);
+        return profesorRepository.findAll(pageable).map(profesorMapper::toProfesorResponseDTO);
     }
 
     @Override
-    public Optional<ProfesorEntity> findById(Long id) {
-        return profesorRepository.findById(id);
+    public Optional<ProfesorResponseDTO> findById(Long id) {
+        return profesorRepository.findById(id).map(profesorMapper::toProfesorResponseDTO);
     }
 
     @Override
-    public List<ProfesorEntity> findAllLista() {
-        return profesorRepository.findAll();
+    public List<ProfesorResponseDTO> findAllLista() {
+        return profesorRepository.findAll().stream()
+                .map(profesorMapper::toProfesorResponseDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public Page<ProfesorEntity> findByNombreOrApellido(String nombre, String apellido, int page, int size, String sort, String direction) {
+    public Page<ProfesorResponseDTO> findByNombreOrApellido(String nombre, String apellido, int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
         boolean filtraNombre = nombre != null && !nombre.trim().isEmpty();
         boolean filtraApellido = apellido != null && !apellido.trim().isEmpty();
+
+        Page<ProfesorEntity> profesoresPage;
         if (filtraNombre && filtraApellido) {
-            return profesorRepository.findByNombreContainingIgnoreCaseAndApellidoContainingIgnoreCase(nombre, apellido, pageable);
+            profesoresPage = profesorRepository.findByNombreContainingIgnoreCaseAndApellidoContainingIgnoreCase(nombre, apellido, pageable);
         } else if (filtraNombre) {
-            return profesorRepository.findByNombreContainingIgnoreCase(nombre, pageable);
+            profesoresPage = profesorRepository.findByNombreContainingIgnoreCase(nombre, pageable);
         } else if (filtraApellido) {
-            return profesorRepository.findByApellidoContainingIgnoreCase(apellido, pageable);
+            profesoresPage = profesorRepository.findByApellidoContainingIgnoreCase(apellido, pageable);
         } else {
-            return profesorRepository.findAll(pageable);
+            profesoresPage = profesorRepository.findAll(pageable);
         }
+
+        return profesoresPage.map(profesorMapper::toProfesorResponseDTO);
     }
 
-
     @Override
-    public Page<ProfesorEntity> findByEspecialidad(String especialidad, int page, int size, String sort, String direction) {
+    public Page<ProfesorResponseDTO> findByEspecialidad(String especialidad, int page, int size, String sort, String direction) {
         Pageable pageable = createPageable(page, size, sort, direction);
-        return profesorRepository.findByEspecialidadIgnoreCase(especialidad, pageable);
+        return profesorRepository.findByEspecialidadIgnoreCase(especialidad, pageable)
+                .map(profesorMapper::toProfesorResponseDTO);
     }
 
     @Override
-    public ProfesorEntity updateProfesor(Long id, ProfesorEntity profesor, boolean syncUsuario) {
+    public ProfesorResponseDTO updateProfesor(Long id, ProfesorCreateDTO profesor, boolean syncUsuario) {
         Optional<ProfesorEntity> profesorEntity = profesorRepository.findById(id);
         if (profesorEntity.isEmpty()) {
             throw new ValidationException("El profesor con ID " + id + " no existe.");
         }
-        //Establecer el ID en el objeto para actualizarlo
-        profesor.setId(id);
-        ProfesorEntity profesorActualizado = profesorRepository.save(profesor);
 
-        //Si se solicita sincronizacion, actualizar el usuario
-        if(syncUsuario) {
+        ProfesorEntity profesorToUpdate = profesorMapper.toProfesorEntity(profesor);
+        profesorToUpdate.setId(id);
+        ProfesorEntity profesorActualizado = profesorRepository.save(profesorToUpdate);
+
+        // Si se solicita sincronización, actualizar el usuario
+        if (syncUsuario) {
             Optional<UsuarioEntity> usuario = usuarioRepository.findByProfesorId(id);
             if (usuario.isPresent()) {
                 UsuarioEntity usuarioActualizado = usuario.get();
@@ -93,51 +111,47 @@ public  class ProfesorServiceImpl implements ProfesorService {
                 usuarioRepository.save(usuarioActualizado);
             }
         }
-        return profesorActualizado;
+
+        return profesorMapper.toProfesorResponseDTO(profesorActualizado);
     }
 
     @Override
-    public ProfesorEntity createProfesorWithUser(ProfesorEntity profesor, UsuarioEntity usuario) {
-        //Verificar si existe el nombre de usuario
-        if(usuarioRepository.existsByUsername(usuario.getUsername())) {
-            throw new ValidationException("Ya existe un usuario con ese username. "+usuario.getUsername());
-        }
-        // Guardar profesor primero
-        ProfesorEntity savedProfesor = profesorRepository.save(profesor);
-        try {
-            // Configurar el usuario con el profesor guardado
+    public ProfesorResponseDTO createProfesorWithUser(ProfesorCreateDTO profesorDTO) {
+        // Guardamos el profesor
+        ProfesorEntity profesorE = profesorMapper.toProfesorEntity(profesorDTO);
+        ProfesorEntity profesorActual = profesorRepository.save(profesorE);
+
+        // Solo creamos usuario si se incluye en el DTO
+        if (profesorDTO.getUsuario() != null) {
+            UsuarioCreateDTO usuarioDTO = profesorDTO.getUsuario();
+
+            UsuarioEntity usuario = new UsuarioEntity();
+            usuario.setUsername(usuarioDTO.getUsername());
+            usuario.setPassword(usuarioDTO.getPassword());
             usuario.setRol(UsuarioEntity.Rol.Profesor);
-            usuario.setProfesor(savedProfesor);
+            usuario.setProfesor(profesorActual);
 
-            // Usar los datos del profesor para el usuario si no se especifican
-            if (usuario.getNombre() == null || usuario.getNombre().isEmpty()) {
-                usuario.setNombre(profesor.getNombre());
-            }
-            if (usuario.getApellido() == null || usuario.getApellido().isEmpty()) {
-                usuario.setApellido(profesor.getApellido());
-            }
+            // Copiar nombre/apellido del profesor si no están definidos en el usuario
+            usuario.setNombre(usuarioDTO.getNombre() != null ? usuarioDTO.getNombre() : profesorDTO.getNombre());
+            usuario.setApellido(usuarioDTO.getApellido() != null ? usuarioDTO.getApellido() : profesorDTO.getApellido());
 
-            // Validar relaciones
             usuarioValidator.validateRolRelations(usuario);
-
-            // Guardar el usuario
             usuarioRepository.save(usuario);
-
-            return savedProfesor;
-        }catch (Exception e) {
-            throw new ValidationException("Error al crear el usuario asociado: "+e.getMessage());
         }
+
+        return profesorMapper.toProfesorResponseDTO(profesorActual);
     }
 
-
     @Override
-    public ProfesorEntity saveProfesor(ProfesorEntity profesor) {
-        return profesorRepository.save(profesor);
+    public ProfesorResponseDTO saveProfesor(ProfesorCreateDTO profesor) {
+        ProfesorEntity profesorEntity = profesorMapper.toProfesorEntity(profesor);
+        ProfesorEntity savedProfesor = profesorRepository.save(profesorEntity);
+        return profesorMapper.toProfesorResponseDTO(savedProfesor);
     }
 
     @Override
     public void deleteProfesor(Long id) {
-        //Primero miramos si está relacionado con el usuario y eliminamos la relacion y guardamosl el usuario
+        // Primero miramos si está relacionado con el usuario y eliminamos la relación
         Optional<UsuarioEntity> usuarioOpt = usuarioRepository.findByProfesorId(id);
         if (usuarioOpt.isPresent()) {
             UsuarioEntity usuario = usuarioOpt.get();
@@ -146,5 +160,13 @@ public  class ProfesorServiceImpl implements ProfesorService {
         }
 
         profesorRepository.deleteById(id);
+    }
+
+    @Override
+    public Page<CursoSimpleDTO> getCursosByProfesor(Long profesorId, int page, int size, String sort, String direction) {
+        Pageable pageable = createPageable(page, size, sort, direction);
+        ProfesorEntity profesor = profesorRepository.findById(profesorId)
+                .orElseThrow(() -> new ValidationException("No existe ningún profesor con id " + profesorId));
+        return cursoRepository.findByProfesoresId(profesorId, pageable).map(cursoMapper::toCursoSimpleDTO);
     }
 }

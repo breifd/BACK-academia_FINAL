@@ -1,12 +1,14 @@
 package com.example.academia.servicios.serviciosImpl;
 
-
 import com.example.academia.DTOs.LoginResponse;
+import com.example.academia.DTOs.Response.UsuarioResponseDTO;
 import com.example.academia.DTOs.UsuarioDTO;
+import com.example.academia.DTOs.Created.UsuarioCreateDTO;
 import com.example.academia.Exceptions.ValidationException;
 import com.example.academia.entidades.AlumnoEntity;
 import com.example.academia.entidades.ProfesorEntity;
 import com.example.academia.entidades.UsuarioEntity;
+import com.example.academia.mappers.UsuarioMapper;
 import com.example.academia.repositorios.AlumnoRepository;
 import com.example.academia.repositorios.ProfesorRepository;
 import com.example.academia.repositorios.UsuarioRepository;
@@ -14,13 +16,11 @@ import com.example.academia.servicios.UsuarioService;
 import com.example.academia.validators.UsuarioValidator;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -30,39 +30,42 @@ public class UsuarioServiceImpl implements UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final AlumnoRepository alumnoRepository;
     private final UsuarioValidator usuarioValidator;
-
+    private final UsuarioMapper usuarioMapper;
 
     @Override
-    public Optional<UsuarioEntity> findByUsername(String username) {
-        return usuarioRepository.findByUsername(username);
+    public Optional<UsuarioResponseDTO> findByUsername(String username) {
+        return usuarioRepository.findByUsername(username)
+                .map(usuarioMapper::toUsuarioResponseDTO);
     }
 
     @Override
-    public List<UsuarioEntity> findAll() {
-        return usuarioRepository.findAll();
+    public List<UsuarioResponseDTO> findAll() {
+        return usuarioRepository.findAll().stream()
+                .map(usuarioMapper::toUsuarioResponseDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
     public LoginResponse login(String username, String password) {
-        try{
-            //Validamos campos
+        try {
+            // Validamos campos
             usuarioValidator.validateUsername(username);
             usuarioValidator.validatePassword(password);
 
-            //Buscamos el usuario por username
+            // Buscamos el usuario por username
             Optional<UsuarioEntity> usuario = usuarioRepository.findByUsername(username);
-            if(usuario.isEmpty()){
+            if (usuario.isEmpty()) {
                 return LoginResponse.error("Usuario o contraseña incorrectos", "INVALID_CREDENTIALS");
             }
+
             // Una vez encontrado el usuario vamos a comprobar las contraseñas
             UsuarioEntity usuarioEntity = usuario.get();
 
-            if(!usuarioEntity.getPassword().equals(password)){
+            if (!usuarioEntity.getPassword().equals(password)) {
                 return LoginResponse.error("Usuario o contraseña incorrectos", "INVALID_CREDENTIALS");
             }
 
-            //Obtenemos los ids relacionados para saber que tipo de usuario es
-
+            // Obtenemos los ids relacionados para saber que tipo de usuario es
             Long profesorId = usuarioEntity.getProfesor() != null ? usuarioEntity.getProfesor().getId() : null;
             Long alumnoId = usuarioEntity.getAlumno() != null ? usuarioEntity.getAlumno().getId() : null;
 
@@ -81,82 +84,69 @@ public class UsuarioServiceImpl implements UsuarioService {
         } catch (Exception e) {
             return LoginResponse.error("Error durante el proceso de login", "INTERNAL_ERROR");
         }
-
     }
 
     @Override
-    public UsuarioEntity saveUsuario(UsuarioEntity usuario) {
-        usuarioValidator.validateRolRelations(usuario);
-        return usuarioRepository.save(usuario);
+    public UsuarioResponseDTO saveUsuario(UsuarioDTO usuario) {
+        UsuarioEntity usuarioEntity = usuarioMapper.toUsuarioEntity(usuario);
+        usuarioValidator.validateRolRelations(usuarioEntity);
+        UsuarioEntity savedUsuario = usuarioRepository.save(usuarioEntity);
+        return usuarioMapper.toUsuarioResponseDTO(savedUsuario);
     }
 
     @Override
     @Transactional
-    public UsuarioEntity createUsuario(UsuarioDTO usuarioDTO) {
-        //Comprobamos si existe el usuario en la base de datos
-        if(usuarioRepository.existsByUsername(usuarioDTO.getUsername())){
+    public UsuarioResponseDTO createUsuario(UsuarioCreateDTO usuarioDTO) {
+        // Comprobamos si existe el usuario en la base de datos
+        if (usuarioRepository.existsByUsername(usuarioDTO.getUsername())) {
             throw new ValidationException("El nombre de usuario ya está en uso");
         }
 
-        //Creamos el usuario pasandole los datos del dto (formulario)
-        UsuarioEntity usuarioEntity = new UsuarioEntity();
-        usuarioEntity.setUsername(usuarioDTO.getUsername());
-        usuarioEntity.setPassword(usuarioDTO.getPassword());
-        usuarioEntity.setNombre(usuarioDTO.getNombre());
-        usuarioEntity.setApellido(usuarioDTO.getApellido());
-        usuarioEntity.setRol(usuarioDTO.getRol());
+        // Crear usuario a partir del DTO
+        UsuarioEntity usuarioEntity = usuarioMapper.createUsuarioFromDTO(usuarioDTO);
 
-        //Asignar relaciones que corresponda
-        if(usuarioDTO.getRol() == UsuarioEntity.Rol.Profesor && usuarioDTO.getProfesorId() != null){
-            Optional<ProfesorEntity> profesor = profesorRepository.findById(usuarioDTO.getProfesorId());
-            if(profesor.isEmpty()){
-                throw new ValidationException("El profesor con ID "+usuarioDTO.getProfesorId()+" no existe");
+        // Establecer el rol y relaciones según corresponda
+        if (usuarioDTO.getRol() == UsuarioEntity.Rol.Profesor && usuarioDTO.getProfesorId() != null) {
+            ProfesorEntity profesor = profesorRepository.findById(usuarioDTO.getProfesorId())
+                    .orElseThrow(() -> new ValidationException("El profesor con ID " + usuarioDTO.getProfesorId() + " no existe"));
+
+            if (usuarioRepository.findByProfesorId(usuarioDTO.getProfesorId()).isPresent()) {
+                throw new ValidationException("El profesor con ID " + usuarioDTO.getProfesorId() + " ya está asociado a un usuario");
             }
-            Optional<UsuarioEntity> usuarioExistente= usuarioRepository.findByProfesorId(usuarioDTO.getProfesorId());
-            if(usuarioExistente.isPresent()){
-                throw new ValidationException("El profesor con ID "+usuarioDTO.getProfesorId()+" ya está asociado al usuario con ID: "+usuarioDTO.getProfesorId());
-            }
-            usuarioEntity.setProfesor(profesor.get());
+
+            usuarioEntity.setProfesor(profesor);
         }
 
         if (usuarioDTO.getRol() == UsuarioEntity.Rol.Alumno && usuarioDTO.getAlumnoId() != null) {
-            Optional<AlumnoEntity> alumno = alumnoRepository.findById(usuarioDTO.getAlumnoId());
-            if (alumno.isEmpty()) {
-                throw new ValidationException("El alumno con ID " + usuarioDTO.getAlumnoId() + " no existe");
+            AlumnoEntity alumno = alumnoRepository.findById(usuarioDTO.getAlumnoId())
+                    .orElseThrow(() -> new ValidationException("El alumno con ID " + usuarioDTO.getAlumnoId() + " no existe"));
+
+            if (usuarioRepository.findByAlumnoId(usuarioDTO.getAlumnoId()).isPresent()) {
+                throw new ValidationException("El alumno con ID " + usuarioDTO.getAlumnoId() + " ya está asociado a un usuario");
             }
 
-            Optional<UsuarioEntity> usuarioExistente = usuarioRepository.findByAlumnoId(usuarioDTO.getAlumnoId());
-            if (usuarioExistente.isPresent()) {
-                throw new ValidationException("El alumno con ID " + usuarioDTO.getAlumnoId() +
-                        " ya está asociado al usuario " + usuarioExistente.get().getUsername());
-            }
-
-            usuarioEntity.setAlumno(alumno.get());
+            usuarioEntity.setAlumno(alumno);
         }
-        usuarioValidator.validateRolRelations(usuarioEntity);
 
-        return usuarioRepository.save(usuarioEntity);
+        usuarioValidator.validateRolRelations(usuarioEntity);
+        UsuarioEntity savedUsuario = usuarioRepository.save(usuarioEntity);
+        return usuarioMapper.toUsuarioResponseDTO(savedUsuario);
     }
 
     @Override
     @Transactional
-    public UsuarioEntity updateUsuario(Long id, UsuarioDTO usuarioDTO) {
-        Optional<UsuarioEntity> usuario = usuarioRepository.findById(id);
-        if(usuario.isEmpty()){
-            throw new ValidationException("El usuario con ID " + id + " no existe");
-        }
-        UsuarioEntity usuarioEntity = usuario.get();
-        //No se permite cambiar el username si ya existe
-        //Si el username del usuario es distinto al nuevo que vas a introdcuir pero existe un usuario con ese username
-        if (!usuarioEntity.getUsername().equals(usuarioDTO.getUsername()) && usuarioRepository.existsByUsername(usuarioDTO.getUsername())) {
+    public UsuarioResponseDTO updateUsuario(Long id, UsuarioDTO usuarioDTO) {
+        UsuarioEntity usuarioEntity = usuarioRepository.findById(id)
+                .orElseThrow(() -> new ValidationException("El usuario con ID " + id + " no existe"));
+
+        // No se permite cambiar el username si ya existe
+        if (!usuarioEntity.getUsername().equals(usuarioDTO.getUsername()) &&
+                usuarioRepository.existsByUsername(usuarioDTO.getUsername())) {
             throw new ValidationException("El nombre de usuario " + usuarioDTO.getUsername() + " ya está en uso");
         }
-        usuarioEntity.setUsername(usuarioDTO.getUsername());
-        if (usuarioDTO.getPassword() != null && !usuarioDTO.getPassword().isEmpty()) {
-            usuarioEntity.setPassword(usuarioDTO.getPassword());
-        }
-        usuarioEntity.setNombre(usuarioDTO.getNombre());
-        usuarioEntity.setApellido(usuarioDTO.getApellido());
+
+        // Actualizar usuario con los nuevos datos
+        usuarioMapper.updateUsuarioFromDTO(usuarioDTO, usuarioEntity);
 
         // Manejar cambio de rol y relaciones
         if (usuarioEntity.getRol() != usuarioDTO.getRol()) {
@@ -172,10 +162,8 @@ public class UsuarioServiceImpl implements UsuarioService {
 
         // Actualizar relación con Profesor si corresponde
         if (usuarioDTO.getRol() == UsuarioEntity.Rol.Profesor && usuarioDTO.getProfesorId() != null) {
-            Optional<ProfesorEntity> profesorOpt = profesorRepository.findById(usuarioDTO.getProfesorId());
-            if (profesorOpt.isEmpty()) {
-                throw new ValidationException("El profesor con ID " + usuarioDTO.getProfesorId() + " no existe");
-            }
+            ProfesorEntity profesor = profesorRepository.findById(usuarioDTO.getProfesorId())
+                    .orElseThrow(() -> new ValidationException("El profesor con ID " + usuarioDTO.getProfesorId() + " no existe"));
 
             // Verificar que el profesor no esté ya asociado a otro usuario
             Optional<UsuarioEntity> usuarioExistente = usuarioRepository.findByProfesorId(usuarioDTO.getProfesorId());
@@ -184,7 +172,7 @@ public class UsuarioServiceImpl implements UsuarioService {
                         " ya está asociado al usuario " + usuarioExistente.get().getUsername());
             }
 
-            usuarioEntity.setProfesor(profesorOpt.get());
+            usuarioEntity.setProfesor(profesor);
         } else if (usuarioDTO.getRol() == UsuarioEntity.Rol.Profesor) {
             // Si tiene rol profesor pero no se especifica ID, mantener la relación anterior
         } else {
@@ -193,10 +181,8 @@ public class UsuarioServiceImpl implements UsuarioService {
 
         // Actualizar relación con Alumno si corresponde
         if (usuarioDTO.getRol() == UsuarioEntity.Rol.Alumno && usuarioDTO.getAlumnoId() != null) {
-            Optional<AlumnoEntity> alumnoOpt = alumnoRepository.findById(usuarioDTO.getAlumnoId());
-            if (alumnoOpt.isEmpty()) {
-                throw new ValidationException("El alumno con ID " + usuarioDTO.getAlumnoId() + " no existe");
-            }
+            AlumnoEntity alumno = alumnoRepository.findById(usuarioDTO.getAlumnoId())
+                    .orElseThrow(() -> new ValidationException("El alumno con ID " + usuarioDTO.getAlumnoId() + " no existe"));
 
             // Verificar que el alumno no esté ya asociado a otro usuario
             Optional<UsuarioEntity> usuarioExistente = usuarioRepository.findByAlumnoId(usuarioDTO.getAlumnoId());
@@ -205,7 +191,7 @@ public class UsuarioServiceImpl implements UsuarioService {
                         " ya está asociado al usuario " + usuarioExistente.get().getUsername());
             }
 
-            usuarioEntity.setAlumno(alumnoOpt.get());
+            usuarioEntity.setAlumno(alumno);
         } else if (usuarioDTO.getRol() == UsuarioEntity.Rol.Alumno) {
             // Si tiene rol alumno pero no se especifica ID, mantener la relación anterior
         } else {
@@ -215,7 +201,8 @@ public class UsuarioServiceImpl implements UsuarioService {
         // Validar relaciones según el rol
         usuarioValidator.validateRolRelations(usuarioEntity);
 
-        return usuarioRepository.save(usuarioEntity);
+        UsuarioEntity savedUsuario = usuarioRepository.save(usuarioEntity);
+        return usuarioMapper.toUsuarioResponseDTO(savedUsuario);
     }
 
     @Override
@@ -225,38 +212,46 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     @Override
-    public List<UsuarioEntity> findByRol(UsuarioEntity.Rol rol) {
-        return usuarioRepository.findByRol(rol);
+    public List<UsuarioResponseDTO> findByRol(String rol) {
+        try {
+            UsuarioEntity.Rol rolEnum = UsuarioEntity.Rol.valueOf(rol);
+            return usuarioRepository.findByRol(rolEnum).stream()
+                    .map(usuarioMapper::toUsuarioResponseDTO)
+                    .collect(Collectors.toList());
+        } catch (IllegalArgumentException e) {
+            throw new ValidationException("Rol no válido: " + rol);
+        }
     }
 
     @Override
-    public Optional<UsuarioEntity> findByProfesorId(Long profesorId) {
-        return usuarioRepository.findByProfesorId(profesorId);
+    public Optional<UsuarioResponseDTO> findByProfesorId(Long profesorId) {
+        return usuarioRepository.findByProfesorId(profesorId)
+                .map(usuarioMapper::toUsuarioResponseDTO);
     }
 
     @Override
-    public Optional<UsuarioEntity> findByAlumnoId(Long alumnoId) {
-        return usuarioRepository.findByAlumnoId(alumnoId);
+    public Optional<UsuarioResponseDTO> findByAlumnoId(Long alumnoId) {
+        return usuarioRepository.findByAlumnoId(alumnoId)
+                .map(usuarioMapper::toUsuarioResponseDTO);
     }
 
-    // Syncronizamos para que el usuario tenga el mismo nombre que el profesor o alumno
     @Override
     @Transactional
-    public UsuarioEntity syncNameWithRelatedEntity(Long usuarioId) {
-        Optional<UsuarioEntity> usuario = usuarioRepository.findById(usuarioId);
-        if(usuario.isEmpty()){
-            throw new ValidationException("El usuario con ID " + usuarioId + " no existe");
-        }
-        UsuarioEntity usuarioEntity = usuario.get();
-        if(usuarioEntity.getRol() == UsuarioEntity.Rol.Profesor && usuarioEntity.getProfesor() !=null){
-            ProfesorEntity profesor= usuarioEntity.getProfesor();
+    public UsuarioResponseDTO syncNameWithRelatedEntity(Long usuarioId) {
+        UsuarioEntity usuarioEntity = usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new ValidationException("El usuario con ID " + usuarioId + " no existe"));
+
+        if (usuarioEntity.getRol() == UsuarioEntity.Rol.Profesor && usuarioEntity.getProfesor() != null) {
+            ProfesorEntity profesor = usuarioEntity.getProfesor();
             usuarioEntity.setNombre(profesor.getNombre());
             usuarioEntity.setApellido(profesor.getApellido());
-        }else if (usuarioEntity.getRol() == UsuarioEntity.Rol.Alumno && usuarioEntity.getAlumno() != null) {
+        } else if (usuarioEntity.getRol() == UsuarioEntity.Rol.Alumno && usuarioEntity.getAlumno() != null) {
             AlumnoEntity alumno = usuarioEntity.getAlumno();
             usuarioEntity.setNombre(alumno.getNombre());
             usuarioEntity.setApellido(alumno.getApellido());
         }
-        return usuarioRepository.save(usuarioEntity);
+
+        UsuarioEntity savedUsuario = usuarioRepository.save(usuarioEntity);
+        return usuarioMapper.toUsuarioResponseDTO(savedUsuario);
     }
 }
