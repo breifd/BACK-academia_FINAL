@@ -17,6 +17,7 @@ public class TareaDTO {
     private LocalDate fechaPublicacion;
     private LocalDate fechaLimite;
     private Long cursoId;
+    private Long profesorId;
     private Boolean paraTodosLosAlumnos;
     private List<Long> alumnosIds;
 }

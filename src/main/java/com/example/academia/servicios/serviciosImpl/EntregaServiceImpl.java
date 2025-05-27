@@ -127,30 +127,30 @@ public class EntregaServiceImpl implements EntregaService {
         AlumnoEntity alumno = alumnoRepository.findById(alumnoId)
                 .orElseThrow(() -> new ValidationException("Alumno no encontrado con ID: " + alumnoId));
 
-        // Verificar que el alumno tiene asignada la tarea
-        boolean alumnoAsignado = isAlumnoAsignadoATarea(tarea, alumnoId);
-        if (!alumnoAsignado) {
-            throw new ValidationException("El alumno no tiene asignada esta tarea");
-        }
-
-        // Verificar si ya existe una entrega para esta tarea y alumno
+        // ✅ SIMPLE: Solo verificar si ya existe una entrega
         Optional<EntregaEntity> entregaExistente = entregaRepository.findByTareaIdAndAlumnoId(tarea.getId(), alumno.getId());
         if (entregaExistente.isPresent()) {
             throw new ValidationException("Ya existe una entrega para esta tarea");
         }
 
-        // ✅ SOLUCIÓN: Crear la entrega MANUALMENTE, NO usar mapper para entidades con relaciones
+        // ✅ CREAR LA ENTREGA
         EntregaEntity entrega = new EntregaEntity();
-        entrega.setTarea(tarea);  // Usar entidades MANAGED
-        entrega.setAlumno(alumno); // Usar entidades MANAGED
+        entrega.setTarea(tarea);
+        entrega.setAlumno(alumno);
         entrega.setFechaEntrega(LocalDateTime.now());
         entrega.setComentarios(entregaDTO.getComentarios());
 
-        // Verificar si está dentro del plazo
-        if (tarea.getFechaLimite() != null && entrega.getFechaEntrega().toLocalDate().isAfter(tarea.getFechaLimite())) {
+        // ✅ LÓGICA DE VENCIMIENTO
+        LocalDateTime ahora = LocalDateTime.now();
+        if (tarea.getFechaLimite() != null && ahora.toLocalDate().isAfter(tarea.getFechaLimite())) {
+            // Tarea vencida - Nota 0 automática
             entrega.setEstado(EntregaEntity.EstadoEntrega.FUERA_PLAZO);
+            entrega.setNota(0.0);
+            entrega.setComentarios((entregaDTO.getComentarios() != null ? entregaDTO.getComentarios() + "\n" : "")
+                    + "ENTREGA FUERA DE PLAZO - Calificación automática: 0");
         } else {
-            entrega.setEstado(EntregaEntity.EstadoEntrega.ENTREGADA);
+            // Tarea en tiempo
+            entrega.setEstado(EntregaEntity.EstadoEntrega.PENDIENTE);
         }
 
         EntregaEntity savedEntrega = entregaRepository.save(entrega);

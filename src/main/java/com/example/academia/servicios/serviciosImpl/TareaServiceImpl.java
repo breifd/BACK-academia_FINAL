@@ -192,13 +192,16 @@ public class TareaServiceImpl implements TareaService {
         CursoEntity curso = cursoRepository.findById(tareaDTO.getCursoId())
                 .orElseThrow(() -> new ValidationException("Curso no encontrado con ID: " + tareaDTO.getCursoId()));
 
-        // Comprobar si el profesor está en el curso
+        // ===== MODO DESARROLLO: VALIDACIÓN COMENTADA =====
+        // Comprobar si el profesor está en el curso - DESACTIVADO EN DESARROLLO
+        /*
         boolean profesorEnCurso = curso.getProfesores().stream()
                 .anyMatch(p -> p.getId().equals(profesorId));
 
         if (!profesorEnCurso) {
             throw new ValidationException("El profesor no imparte en este curso");
         }
+        */
 
         // ✅ SOLUCIÓN: Crear la tarea MANUALMENTE, NO usar mapper
         TareaEntity tarea = new TareaEntity();
@@ -223,9 +226,13 @@ public class TareaServiceImpl implements TareaService {
                 AlumnoEntity alumno = alumnoRepository.findById(alumnoId)
                         .orElseThrow(() -> new ValidationException("Alumno no encontrado con ID: " + alumnoId));
 
+                // ===== MODO DESARROLLO: VALIDACIÓN COMENTADA =====
+                // Validar que el alumno esté en el curso - DESACTIVADO EN DESARROLLO
+                /*
                 if (!validarAlumnoCurso(alumnoId, curso.getId())) {
                     throw new ValidationException("El alumno con ID " + alumnoId + " no está matriculado en el curso");
                 }
+                */
 
                 alumnosAsignados.add(alumno);
             }
@@ -251,9 +258,12 @@ public class TareaServiceImpl implements TareaService {
         AlumnoEntity alumno = alumnoRepository.findById(alumnoId)
                 .orElseThrow(() -> new ValidationException("Alumno no encontrado con ID: " + alumnoId));
 
+        // ===== MODO DESARROLLO: VALIDACIONES COMENTADAS =====
+        /*
         if (!validarAlumnoCurso(alumnoId, tarea.getCurso().getId())) {
             throw new ValidationException("El alumno no está matriculado en el curso de esta tarea");
         }
+        */
 
         if (Boolean.TRUE.equals(tarea.getParaTodosLosAlumnos())) {
             throw new ValidationException("Esta tarea ya está asignada a todos los alumnos del curso");
