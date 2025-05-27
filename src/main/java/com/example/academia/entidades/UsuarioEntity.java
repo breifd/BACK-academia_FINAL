@@ -27,11 +27,12 @@ public class UsuarioEntity {
 
     @NotBlank
     @Size(max = 50)
-    @Column(unique = true, nullable = false)
+    @Column(unique = true, nullable = false, name = "username")
     private String username;
 
     @NotBlank
     @Size(max = 100)
+    @Column(name = "password")
     private String password;
 
     @NotBlank

@@ -1,5 +1,8 @@
 package com.example.academia.validators;
 
+import com.example.academia.DTOs.Created.AlumnoCreateDTO;
+import com.example.academia.DTOs.Created.ProfesorCreateDTO;
+import com.example.academia.DTOs.Created.UsuarioCreateDTO;
 import com.example.academia.entidades.UsuarioEntity;
 import jakarta.validation.ValidationException;
 import org.hibernate.annotations.Comment;
@@ -31,6 +34,29 @@ public class UsuarioValidator {
     public void validatePassword(String password) {
         if (password == null || password.trim().isEmpty()) {
             throw new ValidationException("La contraseña es obligatorio");
+        }
+    }
+    public void validateRequiredUser(Object profileDTO, String profileType) {
+        if (profileDTO instanceof AlumnoCreateDTO) {
+            AlumnoCreateDTO alumno = (AlumnoCreateDTO) profileDTO;
+            if (alumno.getUsuario() == null) {
+                throw new ValidationException("Todo " + profileType + " debe tener un usuario asociado");
+            }
+            validateUserData(alumno.getUsuario());
+        } else if (profileDTO instanceof ProfesorCreateDTO) {
+            ProfesorCreateDTO profesor = (ProfesorCreateDTO) profileDTO;
+            if (profesor.getUsuario() == null) {
+                throw new ValidationException("Todo " + profileType + " debe tener un usuario asociado");
+            }
+            validateUserData(profesor.getUsuario());
+        }
+    }
+    private void validateUserData(UsuarioCreateDTO usuario) {
+        if (usuario.getUsername() == null || usuario.getUsername().trim().isEmpty()) {
+            throw new ValidationException("El username es obligatorio");
+        }
+        if (usuario.getPassword() == null || usuario.getPassword().trim().isEmpty()) {
+            throw new ValidationException("La contraseña es obligatoria");
         }
     }
 }

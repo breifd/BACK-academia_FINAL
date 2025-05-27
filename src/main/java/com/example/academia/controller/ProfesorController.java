@@ -1,7 +1,6 @@
 package com.example.academia.controller;
 
 import com.example.academia.DTOs.Created.ProfesorCreateDTO;
-import com.example.academia.DTOs.Created.UsuarioCreateDTO;
 import com.example.academia.DTOs.Response.ProfesorResponseDTO;
 import com.example.academia.DTOs.SimpleDTO.CursoSimpleDTO;
 import com.example.academia.Exceptions.ValidationException;
@@ -79,12 +78,21 @@ public class ProfesorController {
     }
 
     @PostMapping
-    public ResponseEntity<ProfesorResponseDTO> createProfesor(@RequestBody ProfesorCreateDTO profesor) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(profesorService.saveProfesor(profesor));
+    public ResponseEntity<?> createProfesor(@RequestBody ProfesorCreateDTO profesor) {
+        try {
+            // CAMBIO: Siempre usar el método que crea con usuario
+            ProfesorResponseDTO createdProfesor = profesorService.saveProfesor(profesor);
+            return ResponseEntity.status(HttpStatus.CREATED).body(createdProfesor);
+        } catch (ValidationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error interno del servidor: " + e.getMessage()));
+        }
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ProfesorResponseDTO> updateProfesor(
+    public ResponseEntity<?> updateProfesor(
             @PathVariable Long id,
             @RequestBody ProfesorCreateDTO profesor,
             @RequestParam(defaultValue = "false") boolean syncUsuario) {
@@ -92,29 +100,32 @@ public class ProfesorController {
             ProfesorResponseDTO profesorActualizado = profesorService.updateProfesor(id, profesor, syncUsuario);
             return ResponseEntity.ok(profesorActualizado);
         } catch (ValidationException e) {
-            return ResponseEntity.badRequest().body(null);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error interno del servidor: " + e.getMessage()));
         }
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteProfesor(@PathVariable Long id) {
-        return profesorService.findById(id)
-                .map(profesor -> {
-                    profesorService.deleteProfesor(id);
-                    return ResponseEntity.noContent().<Void>build();
-                })
-                .orElse(ResponseEntity.notFound().build());
-    }
-
-    @PostMapping("/con-usuario")
-    public ResponseEntity<?> crearWithUser(@RequestBody ProfesorCreateDTO profesorDTO) {
+    public ResponseEntity<?> deleteProfesor(@PathVariable Long id) {
         try {
-            ProfesorResponseDTO createdProfesor = profesorService.createProfesorWithUser(profesorDTO);
-            return ResponseEntity.status(HttpStatus.CREATED).body(createdProfesor);
-        } catch (Exception e) {
+            if (profesorService.findById(id).isPresent()) {
+                profesorService.deleteProfesor(id);
+                return ResponseEntity.noContent().build();
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error interno del servidor: " + e.getMessage()));
         }
     }
+
+    // ELIMINADO: Ya no necesitamos el endpoint separado para crear con usuario
+    // porque ahora siempre se crea con usuario
 
     @ExceptionHandler(ValidationException.class)
     public ResponseEntity<Map<String, String>> handleValidationException(ValidationException e) {

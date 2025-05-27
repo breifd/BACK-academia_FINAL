@@ -28,13 +28,15 @@ public interface EntregaMapper {
     List<EntregaSimpleDTO> toEntregaSimpleDTOList(List<EntregaEntity> entregas);
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "tarea", ignore = true)  // 🔥 CRÍTICO
+    @Mapping(target = "alumno", ignore = true) // 🔥 CRÍTICO
     @Mapping(target = "documento", ignore = true)
     @Mapping(target = "nombreDocumento", ignore = true)
     @Mapping(target = "tipoDocumento", ignore = true)
     @Mapping(target = "estado", ignore = true)
-    @Mapping(target = "fechaEntrega", expression = "java(java.time.LocalDateTime.now())")
+    @Mapping(target = "fechaEntrega", ignore = true)
     @Mapping(target = "nota", ignore = true)
-    EntregaEntity toEntregaEntity(EntregaCreateDTO dto);
+    EntregaEntity toEntregaEntityWithoutRelations(EntregaCreateDTO dto);
 
     // Método por defecto para establecer el estado inicial
     default EntregaEntity establecerEstadoInicial(EntregaEntity entrega) {

@@ -1,11 +1,9 @@
 package com.example.academia.controller;
 
 import com.example.academia.DTOs.Created.AlumnoCreateDTO;
-import com.example.academia.DTOs.Created.UsuarioCreateDTO;
 import com.example.academia.DTOs.Response.AlumnoResponseDTO;
 import com.example.academia.DTOs.SimpleDTO.CursoSimpleDTO;
 import com.example.academia.Exceptions.ValidationException;
-import com.example.academia.entidades.UsuarioEntity;
 import com.example.academia.servicios.AlumnoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -13,11 +11,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.Map;
 
 @RestController
-@RequestMapping("api/alumnos")
+@RequestMapping("/api/alumnos")
 @CrossOrigin(origins = "http://localhost:4200")
 @RequiredArgsConstructor
 public class AlumnoController {
@@ -25,19 +22,22 @@ public class AlumnoController {
     private final AlumnoService alumnoService;
 
     @PostMapping
-    public ResponseEntity<AlumnoResponseDTO> createAlumno(@RequestBody AlumnoCreateDTO alumno) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(alumnoService.saveAlumno(alumno));
-    }
-
-    @PostMapping("/con-usuario")
-    public ResponseEntity<?> createAlumnoWithUser(@RequestBody AlumnoCreateDTO alumnoDTO) {
+    public ResponseEntity<?> createAlumno(@RequestBody AlumnoCreateDTO alumno) {
         try {
-            AlumnoResponseDTO createdAlumno = alumnoService.createAlumnoWithUser(alumnoDTO);
+            AlumnoResponseDTO createdAlumno = alumnoService.saveAlumno(alumno);
             return ResponseEntity.status(HttpStatus.CREATED).body(createdAlumno);
-        } catch (Exception e) {
+        } catch (ValidationException e) {
+            System.err.println("❌ Error de validación: " + e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            System.err.println("❌ Error interno: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error interno del servidor", "details", e.getMessage()));
         }
     }
+    // ELIMINADO: Ya no necesitamos el endpoint separado para crear con usuario
+    // porque ahora siempre se crea con usuario
 
     @GetMapping
     public ResponseEntity<Page<AlumnoResponseDTO>> getAllAlumnos(
@@ -67,7 +67,7 @@ public class AlumnoController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<AlumnoResponseDTO> updateAlumno(
+    public ResponseEntity<?> updateAlumno(
             @PathVariable long id,
             @RequestBody AlumnoCreateDTO alumno,
             @RequestParam(defaultValue = "false") boolean syncUsuario) {
@@ -75,7 +75,10 @@ public class AlumnoController {
             AlumnoResponseDTO updatedAlumno = alumnoService.updateAlumno(id, alumno, syncUsuario);
             return ResponseEntity.ok(updatedAlumno);
         } catch (ValidationException e) {
-            return ResponseEntity.badRequest().body(null);
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error interno del servidor: " + e.getMessage()));
         }
     }
 
@@ -90,12 +93,19 @@ public class AlumnoController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteAlumno(@PathVariable long id) {
-        if (alumnoService.findById(id).isPresent()) {
-            alumnoService.deleteAlumno(id);
-            return ResponseEntity.noContent().build();
-        } else {
-            return ResponseEntity.notFound().build();
+    public ResponseEntity<?> deleteAlumno(@PathVariable long id) {
+        try {
+            if (alumnoService.findById(id).isPresent()) {
+                alumnoService.deleteAlumno(id);
+                return ResponseEntity.noContent().build();
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (ValidationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error interno del servidor: " + e.getMessage()));
         }
     }
 

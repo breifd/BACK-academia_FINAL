@@ -2,6 +2,7 @@ package com.example.academia.controller;
 
 import com.example.academia.DTOs.DocumentoDTO;
 import com.example.academia.DTOs.Response.TareaResponseDTO;
+import com.example.academia.DTOs.Response.UsuarioResponseDTO;
 import com.example.academia.DTOs.SimpleDTO.TareaSimpleDTO;
 import com.example.academia.DTOs.TareaDTO;
 import com.example.academia.Exceptions.ValidationException;
@@ -92,12 +93,25 @@ public class TareaController {
         try {
             // Obtener el usuario autenticado
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+            // Verificar que la autenticación no sea null
+            if (authentication == null || authentication.getName() == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Usuario no autenticado"));
+            }
+
             String username = authentication.getName();
 
-            Optional<UsuarioEntity> usuarioOpt = usuarioService.findByUsername(username).map(UsuarioEntity.class::cast);
-            if (usuarioOpt.isEmpty() || usuarioOpt.get().getRol() != UsuarioEntity.Rol.Profesor || usuarioOpt.get().getProfesor() == null) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Solo los profesores pueden crear tareas"));
+            Optional<UsuarioResponseDTO> usuarioOpt = usuarioService.findByUsername(username);
+            if (usuarioOpt.isEmpty() || usuarioOpt.get().getRol() != UsuarioEntity.Rol.Profesor) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Solo los profesores pueden crear tareas"));
             }
+            UsuarioResponseDTO usuario = usuarioOpt.get();
+            if (usuario.getProfesor() == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Usuario profesor sin perfil de profesor asociado"));
+            }
+
 
             Long profesorId = usuarioOpt.get().getProfesor().getId();
             TareaResponseDTO tarea = tareaService.createTarea(tareaDTO, profesorId);
@@ -117,23 +131,31 @@ public class TareaController {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
 
-            Optional<UsuarioEntity> usuarioOpt = usuarioService.findByUsername(username).map(UsuarioEntity.class::cast);
+            // CORRECCIÓN: Usar UsuarioResponseDTO correctamente
+            Optional<UsuarioResponseDTO> usuarioOpt = usuarioService.findByUsername(username);
             if (usuarioOpt.isEmpty() || usuarioOpt.get().getRol() != UsuarioEntity.Rol.Profesor) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Solo los profesores pueden subir documentos a tareas"));
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Solo los profesores pueden subir documentos a tareas"));
             }
 
-            // Verificar que el profesor es el propietario de la tarea
-            if (usuarioOpt.get().getProfesor() != null) {
-                Long profesorId = usuarioOpt.get().getProfesor().getId();
-                if (!tareaService.validarTareaProfesor(id, profesorId)) {
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "No es propietario de esta tarea"));
-                }
+            UsuarioResponseDTO usuario = usuarioOpt.get();
+            if (usuario.getProfesor() == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Usuario sin perfil de profesor"));
+            }
+
+            Long profesorId = usuario.getProfesor().getId();
+            if (!tareaService.validarTareaProfesor(id, profesorId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "No es propietario de esta tarea"));
             }
 
             TareaResponseDTO tarea = tareaService.uploadDocumento(id, file);
             return ResponseEntity.ok(tarea);
+
         } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Error al procesar el archivo"));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error al procesar el archivo"));
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -161,22 +183,29 @@ public class TareaController {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
 
-            Optional<UsuarioEntity> usuarioOpt = usuarioService.findByUsername(username).map(UsuarioEntity.class::cast);
+            // CORRECCIÓN: Usar UsuarioResponseDTO correctamente
+            Optional<UsuarioResponseDTO> usuarioOpt = usuarioService.findByUsername(username);
             if (usuarioOpt.isEmpty() || usuarioOpt.get().getRol() != UsuarioEntity.Rol.Profesor) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Solo los profesores pueden modificar tareas"));
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Solo los profesores pueden modificar tareas"));
             }
 
-            // Verificar que el profesor es el propietario de la tarea
-            if (usuarioOpt.get().getProfesor() != null) {
-                Long profesorId = usuarioOpt.get().getProfesor().getId();
-                if (!tareaService.validarTareaProfesor(id, profesorId)) {
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "No es propietario de esta tarea"));
-                }
+            UsuarioResponseDTO usuario = usuarioOpt.get();
+            if (usuario.getProfesor() == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Usuario sin perfil de profesor"));
+            }
+
+            Long profesorId = usuario.getProfesor().getId();
+            if (!tareaService.validarTareaProfesor(id, profesorId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "No es propietario de esta tarea"));
             }
 
             tareaDTO.setId(id);
             TareaResponseDTO tareaActualizada = tareaService.saveTarea(tareaDTO);
             return ResponseEntity.ok(tareaActualizada);
+
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -189,24 +218,32 @@ public class TareaController {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
 
-            Optional<UsuarioEntity> usuarioOpt = usuarioService.findByUsername(username).map(UsuarioEntity.class::cast);
+            // CORRECCIÓN: Usar UsuarioResponseDTO correctamente
+            Optional<UsuarioResponseDTO> usuarioOpt = usuarioService.findByUsername(username);
             if (usuarioOpt.isEmpty() || usuarioOpt.get().getRol() != UsuarioEntity.Rol.Profesor) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Solo los profesores pueden eliminar tareas"));
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Solo los profesores pueden eliminar tareas"));
             }
 
-            // Verificar que el profesor es el propietario de la tarea
-            if (usuarioOpt.get().getProfesor() != null) {
-                Long profesorId = usuarioOpt.get().getProfesor().getId();
-                if (!tareaService.validarTareaProfesor(id, profesorId)) {
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "No es propietario de esta tarea"));
-                }
+            UsuarioResponseDTO usuario = usuarioOpt.get();
+            if (usuario.getProfesor() == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Usuario sin perfil de profesor"));
+            }
+
+            Long profesorId = usuario.getProfesor().getId();
+            if (!tareaService.validarTareaProfesor(id, profesorId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "No es propietario de esta tarea"));
             }
 
             // Eliminar la tarea
             tareaService.deleteTarea(id);
             return ResponseEntity.noContent().build();
+
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -259,14 +296,17 @@ public class TareaController {
             // Validación del usuario
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
-            Optional<UsuarioEntity> usuarioOpt = usuarioService.findByUsername(username).map(UsuarioEntity.class::cast);
 
+            // CORRECCIÓN: Usar UsuarioResponseDTO correctamente
+            Optional<UsuarioResponseDTO> usuarioOpt = usuarioService.findByUsername(username);
             if (usuarioOpt.isEmpty() || usuarioOpt.get().getRol() != UsuarioEntity.Rol.Profesor) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Solo los profesores pueden asignar tareas"));
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Solo los profesores pueden asignar tareas"));
             }
 
             TareaResponseDTO tarea = tareaService.asignarTareaAAlumno(tareaId, alumnoId);
             return ResponseEntity.ok(tarea);
+
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -280,14 +320,17 @@ public class TareaController {
             // Validación del usuario
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
-            Optional<UsuarioEntity> usuarioOpt = usuarioService.findByUsername(username).map(UsuarioEntity.class::cast);
 
+            // CORRECCIÓN: Usar UsuarioResponseDTO correctamente
+            Optional<UsuarioResponseDTO> usuarioOpt = usuarioService.findByUsername(username);
             if (usuarioOpt.isEmpty() || usuarioOpt.get().getRol() != UsuarioEntity.Rol.Profesor) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Solo los profesores pueden desasignar tareas"));
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Solo los profesores pueden desasignar tareas"));
             }
 
             TareaResponseDTO tarea = tareaService.desasignarTareaDeAlumno(tareaId, alumnoId);
             return ResponseEntity.ok(tarea);
+
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

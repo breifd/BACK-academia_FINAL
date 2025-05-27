@@ -4,6 +4,7 @@ import com.example.academia.DTOs.LoginResponse;
 import com.example.academia.DTOs.Response.UsuarioResponseDTO;
 import com.example.academia.DTOs.UsuarioDTO;
 import com.example.academia.DTOs.Created.UsuarioCreateDTO;
+import com.example.academia.entidades.UsuarioEntity;
 
 import java.util.List;
 import java.util.Optional;
@@ -23,6 +24,8 @@ public interface UsuarioService {
     UsuarioResponseDTO updateUsuario(Long id, UsuarioDTO usuarioDTO);
 
     void deleteUsuario(Long id);
+
+    Optional<UsuarioEntity> findEntityByUsername(String username);
 
     List<UsuarioResponseDTO> findByRol(String rol);
 

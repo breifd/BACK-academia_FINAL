@@ -12,9 +12,14 @@ import java.util.List;
 @Mapper(componentModel = "spring")
 public interface AlumnoMapper {
 
+
     AlumnoResponseDTO toAlumnoResponseDTO(AlumnoEntity alumno);
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "usuario", ignore = true)  // ✅ IGNORAR relación usuario
+    @Mapping(target = "cursos", ignore = true)   // ✅ IGNORAR relación cursos
+    @Mapping(target = "tareasAsignadas", ignore = true)  // ✅ IGNORAR relación tareas
+    @Mapping(target = "entregas", ignore = true) // ✅ IGNORAR relación entregas
     AlumnoEntity toAlumnoEntity(AlumnoCreateDTO dto);
 
     AlumnoSimpleDTO toAlumnoSimpleDTO(AlumnoEntity alumno);

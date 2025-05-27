@@ -4,6 +4,7 @@ import com.example.academia.DTOs.CalificacionDTO;
 import com.example.academia.DTOs.DocumentoDTO;
 import com.example.academia.DTOs.Created.EntregaCreateDTO;
 import com.example.academia.DTOs.Response.EntregaResponseDTO;
+import com.example.academia.DTOs.Response.UsuarioResponseDTO;
 import com.example.academia.Exceptions.ValidationException;
 import com.example.academia.entidades.UsuarioEntity;
 import com.example.academia.servicios.EntregaService;
@@ -54,14 +55,28 @@ public class EntregaController {
         try {
             // Obtener el usuario autenticado
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            String username = authentication.getName();
 
-            Optional<UsuarioEntity> usuarioOpt = usuarioService.findByUsername(username).map(UsuarioEntity.class::cast);
-            if (usuarioOpt.isEmpty() || usuarioOpt.get().getRol() != UsuarioEntity.Rol.Alumno || usuarioOpt.get().getAlumno() == null) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Solo los alumnos pueden crear entregas"));
+            if (authentication == null || authentication.getName() == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Usuario no autenticado"));
             }
 
-            Long alumnoId = usuarioOpt.get().getAlumno().getId();
+            String username = authentication.getName();
+
+            // CORRECCIÓN: Usar UsuarioResponseDTO
+            Optional<UsuarioResponseDTO> usuarioOpt = usuarioService.findByUsername(username);
+            if (usuarioOpt.isEmpty() || usuarioOpt.get().getRol() != UsuarioEntity.Rol.Alumno) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Solo los alumnos pueden crear entregas"));
+            }
+
+            UsuarioResponseDTO usuario = usuarioOpt.get();
+            if (usuario.getAlumno() == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Usuario alumno sin perfil de alumno asociado"));
+            }
+
+            Long alumnoId = usuario.getAlumno().getId();
             EntregaResponseDTO entrega = entregaService.crearEntrega(entregaDTO, alumnoId);
             return ResponseEntity.status(HttpStatus.CREATED).body(entrega);
         } catch (ValidationException e) {
@@ -79,25 +94,31 @@ public class EntregaController {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
 
-            Optional<UsuarioEntity> usuarioOpt = usuarioService.findByUsername(username).map(UsuarioEntity.class::cast);
+            // CORRECCIÓN: Trabajar con UsuarioResponseDTO en lugar de hacer cast incorrecto
+            Optional<UsuarioResponseDTO> usuarioOpt = usuarioService.findByUsername(username);
             if (usuarioOpt.isEmpty() || usuarioOpt.get().getRol() != UsuarioEntity.Rol.Alumno) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Solo los alumnos pueden subir documentos a entregas"));
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Solo los alumnos pueden subir documentos a entregas"));
             }
 
-            // Verificar que el alumno es el propietario de la entrega
-            if (usuarioOpt.get().getAlumno() != null) {
-                Long alumnoId = usuarioOpt.get().getAlumno().getId();
-                if (!entregaService.validarEntregaAlumno(id, alumnoId)) {
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "No es propietario de esta entrega"));
-                }
-
-                EntregaResponseDTO entrega = entregaService.uploadDocumento(id, file, alumnoId);
-                return ResponseEntity.ok(entrega);
-            } else {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Usuario sin perfil de alumno"));
+            UsuarioResponseDTO usuario = usuarioOpt.get();
+            if (usuario.getAlumno() == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Usuario sin perfil de alumno"));
             }
+
+            Long alumnoId = usuario.getAlumno().getId();
+            if (!entregaService.validarEntregaAlumno(id, alumnoId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "No es propietario de esta entrega"));
+            }
+
+            EntregaResponseDTO entrega = entregaService.uploadDocumento(id, file, alumnoId);
+            return ResponseEntity.ok(entrega);
+
         } catch (IOException e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Error al procesar el archivo"));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error al procesar el archivo"));
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -113,14 +134,23 @@ public class EntregaController {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
 
-            Optional<UsuarioEntity> usuarioOpt = usuarioService.findByUsername(username).map(UsuarioEntity.class::cast);
-            if (usuarioOpt.isEmpty() || usuarioOpt.get().getRol() != UsuarioEntity.Rol.Profesor || usuarioOpt.get().getProfesor() == null) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Solo los profesores pueden calificar entregas"));
+            // CORRECCIÓN: Usar UsuarioResponseDTO correctamente
+            Optional<UsuarioResponseDTO> usuarioOpt = usuarioService.findByUsername(username);
+            if (usuarioOpt.isEmpty() || usuarioOpt.get().getRol() != UsuarioEntity.Rol.Profesor) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Solo los profesores pueden calificar entregas"));
             }
 
-            Long profesorId = usuarioOpt.get().getProfesor().getId();
+            UsuarioResponseDTO usuario = usuarioOpt.get();
+            if (usuario.getProfesor() == null) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Usuario sin perfil de profesor"));
+            }
+
+            Long profesorId = usuario.getProfesor().getId();
             EntregaResponseDTO entrega = entregaService.calificarEntrega(id, calificacionDTO, profesorId);
             return ResponseEntity.ok(entrega);
+
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
@@ -133,25 +163,32 @@ public class EntregaController {
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             String username = authentication.getName();
 
-            Optional<UsuarioEntity> usuarioOpt = usuarioService.findByUsername(username).map(UsuarioEntity.class::cast);
+            // CORRECCIÓN: Usar UsuarioResponseDTO correctamente
+            Optional<UsuarioResponseDTO> usuarioOpt = usuarioService.findByUsername(username);
             if (usuarioOpt.isEmpty()) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Usuario no autenticado"));
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Usuario no autenticado"));
             }
 
+            UsuarioResponseDTO usuario = usuarioOpt.get();
+
             // Verificar permisos según el rol
-            if (usuarioOpt.get().getRol() == UsuarioEntity.Rol.Alumno && usuarioOpt.get().getAlumno() != null) {
+            if (usuario.getRol() == UsuarioEntity.Rol.Alumno && usuario.getAlumno() != null) {
                 // Si es alumno, solo puede ver su propia entrega
-                if (!entregaService.validarEntregaAlumno(id, usuarioOpt.get().getAlumno().getId())) {
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "No tiene permisos para ver esta entrega"));
+                if (!entregaService.validarEntregaAlumno(id, usuario.getAlumno().getId())) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                            .body(Map.of("error", "No tiene permisos para ver esta entrega"));
                 }
-            } else if (usuarioOpt.get().getRol() == UsuarioEntity.Rol.Profesor && usuarioOpt.get().getProfesor() != null) {
+            } else if (usuario.getRol() == UsuarioEntity.Rol.Profesor && usuario.getProfesor() != null) {
                 // Si es profesor, solo puede ver entregas de sus tareas
-                if (!entregaService.validarEntregaProfesor(id, usuarioOpt.get().getProfesor().getId())) {
-                    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "No tiene permisos para ver esta entrega"));
+                if (!entregaService.validarEntregaProfesor(id, usuario.getProfesor().getId())) {
+                    return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                            .body(Map.of("error", "No tiene permisos para ver esta entrega"));
                 }
-            } else if (usuarioOpt.get().getRol() != UsuarioEntity.Rol.Admin) {
+            } else if (usuario.getRol() != UsuarioEntity.Rol.Admin) {
                 // Si no es alumno, profesor ni admin, no tiene permisos
-                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "No tiene permisos para ver esta entrega"));
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "No tiene permisos para ver esta entrega"));
             }
 
             DocumentoDTO documento = entregaService.downloadDocumento(id);
@@ -161,8 +198,10 @@ public class EntregaController {
             headers.setContentDispositionFormData("attachment", documento.getNombreArchivo());
 
             return new ResponseEntity<>(documento.getContenido(), headers, HttpStatus.OK);
+
         } catch (ValidationException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", e.getMessage()));
         }
     }
 

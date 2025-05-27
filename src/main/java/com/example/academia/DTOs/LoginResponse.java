@@ -25,6 +25,27 @@ public class LoginResponse {
     private Long alumnoId;
     private String errorCode;
 
+    private String token;
+    private String tokenType = "Bearer";
+
+
+    // Respuesta para el Login Exitoso CON TOKEN JWT
+    public static LoginResponse success(String username, String nombre, String apellido,
+                                        UsuarioEntity.Rol rol, Long profesorId, Long alumnoId, String token) {
+        return LoginResponse.builder()
+                .success(true)
+                .message("Login exitoso")
+                .username(username)
+                .nombre(nombre)
+                .apellido(apellido)
+                .rol(rol)
+                .profesorId(profesorId)
+                .alumnoId(alumnoId)
+                .token(token)
+                .tokenType("Bearer")
+                .build();
+    }
+
     // Respuesta para el Login Exitoso
     public static LoginResponse success ( String username, String nombre, String apellido,
     UsuarioEntity.Rol rol, Long profesorId, Long alumnoId) {

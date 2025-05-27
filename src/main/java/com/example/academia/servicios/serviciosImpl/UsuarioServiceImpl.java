@@ -16,6 +16,7 @@ import com.example.academia.servicios.UsuarioService;
 import com.example.academia.validators.UsuarioValidator;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -31,6 +32,7 @@ public class UsuarioServiceImpl implements UsuarioService {
     private final AlumnoRepository alumnoRepository;
     private final UsuarioValidator usuarioValidator;
     private final UsuarioMapper usuarioMapper;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public Optional<UsuarioResponseDTO> findByUsername(String username) {
@@ -58,10 +60,10 @@ public class UsuarioServiceImpl implements UsuarioService {
                 return LoginResponse.error("Usuario o contraseña incorrectos", "INVALID_CREDENTIALS");
             }
 
-            // Una vez encontrado el usuario vamos a comprobar las contraseñas
             UsuarioEntity usuarioEntity = usuario.get();
 
-            if (!usuarioEntity.getPassword().equals(password)) {
+            // Verificar la contraseña usando el encoder
+            if (!passwordEncoder.matches(password, usuarioEntity.getPassword())) {
                 return LoginResponse.error("Usuario o contraseña incorrectos", "INVALID_CREDENTIALS");
             }
 
@@ -69,7 +71,7 @@ public class UsuarioServiceImpl implements UsuarioService {
             Long profesorId = usuarioEntity.getProfesor() != null ? usuarioEntity.getProfesor().getId() : null;
             Long alumnoId = usuarioEntity.getAlumno() != null ? usuarioEntity.getAlumno().getId() : null;
 
-            // Login exitoso con información extendida
+            // Login exitoso con información extendida (sin token aquí, se maneja en el controller)
             return LoginResponse.success(
                     usuarioEntity.getUsername(),
                     usuarioEntity.getNombre(),
@@ -89,6 +91,12 @@ public class UsuarioServiceImpl implements UsuarioService {
     @Override
     public UsuarioResponseDTO saveUsuario(UsuarioDTO usuario) {
         UsuarioEntity usuarioEntity = usuarioMapper.toUsuarioEntity(usuario);
+
+        // Si se proporciona una nueva contraseña, encriptarla
+        if (usuario.getPassword() != null && !usuario.getPassword().isEmpty()) {
+            usuarioEntity.setPassword(passwordEncoder.encode(usuario.getPassword()));
+        }
+
         usuarioValidator.validateRolRelations(usuarioEntity);
         UsuarioEntity savedUsuario = usuarioRepository.save(usuarioEntity);
         return usuarioMapper.toUsuarioResponseDTO(savedUsuario);
@@ -105,11 +113,18 @@ public class UsuarioServiceImpl implements UsuarioService {
         // Crear usuario a partir del DTO
         UsuarioEntity usuarioEntity = usuarioMapper.createUsuarioFromDTO(usuarioDTO);
 
-        // Establecer el rol y relaciones según corresponda
+        // Encriptar contraseña si no está encriptada
+        if (usuarioDTO.getPassword() != null && !isPasswordEncrypted(usuarioDTO.getPassword())) {
+            usuarioEntity.setPassword(passwordEncoder.encode(usuarioDTO.getPassword()));
+        }
+
+        // CORRECCIÓN: Manejar las relaciones correctamente
         if (usuarioDTO.getRol() == UsuarioEntity.Rol.Profesor && usuarioDTO.getProfesorId() != null) {
+            // IMPORTANTE: Obtener la entidad desde la base de datos para que esté en estado MANAGED
             ProfesorEntity profesor = profesorRepository.findById(usuarioDTO.getProfesorId())
                     .orElseThrow(() -> new ValidationException("El profesor con ID " + usuarioDTO.getProfesorId() + " no existe"));
 
+            // Verificar que no esté ya asociado
             if (usuarioRepository.findByProfesorId(usuarioDTO.getProfesorId()).isPresent()) {
                 throw new ValidationException("El profesor con ID " + usuarioDTO.getProfesorId() + " ya está asociado a un usuario");
             }
@@ -118,9 +133,11 @@ public class UsuarioServiceImpl implements UsuarioService {
         }
 
         if (usuarioDTO.getRol() == UsuarioEntity.Rol.Alumno && usuarioDTO.getAlumnoId() != null) {
+            // IMPORTANTE: Obtener la entidad desde la base de datos para que esté en estado MANAGED
             AlumnoEntity alumno = alumnoRepository.findById(usuarioDTO.getAlumnoId())
                     .orElseThrow(() -> new ValidationException("El alumno con ID " + usuarioDTO.getAlumnoId() + " no existe"));
 
+            // Verificar que no esté ya asociado
             if (usuarioRepository.findByAlumnoId(usuarioDTO.getAlumnoId()).isPresent()) {
                 throw new ValidationException("El alumno con ID " + usuarioDTO.getAlumnoId() + " ya está asociado a un usuario");
             }
@@ -128,9 +145,18 @@ public class UsuarioServiceImpl implements UsuarioService {
             usuarioEntity.setAlumno(alumno);
         }
 
+        // Validar las relaciones
         usuarioValidator.validateRolRelations(usuarioEntity);
+
+        // Guardar el usuario
         UsuarioEntity savedUsuario = usuarioRepository.save(usuarioEntity);
         return usuarioMapper.toUsuarioResponseDTO(savedUsuario);
+    }
+
+    // Método auxiliar para verificar si una contraseña ya está encriptada
+    private boolean isPasswordEncrypted(String password) {
+        // BCrypt passwords always start with $2a$, $2b$, or $2y$
+        return password != null && password.matches("^\\$2[ayb]\\$.{56}$");
     }
 
     @Override
@@ -147,6 +173,16 @@ public class UsuarioServiceImpl implements UsuarioService {
 
         // Actualizar usuario con los nuevos datos
         usuarioMapper.updateUsuarioFromDTO(usuarioDTO, usuarioEntity);
+
+        // Manejar contraseña
+        if (usuarioDTO.getPassword() != null && !usuarioDTO.getPassword().isEmpty()) {
+            // Si la contraseña no está encriptada, encriptarla
+            if (!isPasswordEncrypted(usuarioDTO.getPassword())) {
+                usuarioEntity.setPassword(passwordEncoder.encode(usuarioDTO.getPassword()));
+            } else {
+                usuarioEntity.setPassword(usuarioDTO.getPassword());
+            }
+        }
 
         // Manejar cambio de rol y relaciones
         if (usuarioEntity.getRol() != usuarioDTO.getRol()) {
@@ -173,9 +209,7 @@ public class UsuarioServiceImpl implements UsuarioService {
             }
 
             usuarioEntity.setProfesor(profesor);
-        } else if (usuarioDTO.getRol() == UsuarioEntity.Rol.Profesor) {
-            // Si tiene rol profesor pero no se especifica ID, mantener la relación anterior
-        } else {
+        } else if (usuarioDTO.getRol() != UsuarioEntity.Rol.Profesor) {
             usuarioEntity.setProfesor(null);
         }
 
@@ -192,9 +226,7 @@ public class UsuarioServiceImpl implements UsuarioService {
             }
 
             usuarioEntity.setAlumno(alumno);
-        } else if (usuarioDTO.getRol() == UsuarioEntity.Rol.Alumno) {
-            // Si tiene rol alumno pero no se especifica ID, mantener la relación anterior
-        } else {
+        } else if (usuarioDTO.getRol() != UsuarioEntity.Rol.Alumno) {
             usuarioEntity.setAlumno(null);
         }
 
@@ -209,6 +241,11 @@ public class UsuarioServiceImpl implements UsuarioService {
     @Transactional
     public void deleteUsuario(Long id) {
         usuarioRepository.deleteById(id);
+    }
+
+    @Override
+    public Optional<UsuarioEntity> findEntityByUsername(String username) {
+        return usuarioRepository.findByUsername(username);
     }
 
     @Override

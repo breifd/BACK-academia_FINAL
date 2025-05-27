@@ -63,7 +63,7 @@ public class EntregaServiceImpl implements EntregaService {
 
     @Override
     public EntregaResponseDTO saveEntrega(EntregaCreateDTO entrega) {
-        EntregaEntity entregaEntity = entregaMapper.toEntregaEntity(entrega);
+        EntregaEntity entregaEntity = entregaMapper.toEntregaEntityWithoutRelations(entrega);
         EntregaEntity savedEntrega = entregaRepository.save(entregaEntity);
         return entregaMapper.toEntregaResponseDTO(savedEntrega);
     }
@@ -139,10 +139,10 @@ public class EntregaServiceImpl implements EntregaService {
             throw new ValidationException("Ya existe una entrega para esta tarea");
         }
 
-        // Crear la entrega
-        EntregaEntity entrega = entregaMapper.toEntregaEntity(entregaDTO);
-        entrega.setTarea(tarea);
-        entrega.setAlumno(alumno);
+        // ✅ SOLUCIÓN: Crear la entrega MANUALMENTE, NO usar mapper para entidades con relaciones
+        EntregaEntity entrega = new EntregaEntity();
+        entrega.setTarea(tarea);  // Usar entidades MANAGED
+        entrega.setAlumno(alumno); // Usar entidades MANAGED
         entrega.setFechaEntrega(LocalDateTime.now());
         entrega.setComentarios(entregaDTO.getComentarios());
 
@@ -156,6 +156,7 @@ public class EntregaServiceImpl implements EntregaService {
         EntregaEntity savedEntrega = entregaRepository.save(entrega);
         return entregaMapper.toEntregaResponseDTO(savedEntrega);
     }
+
 
     private boolean isAlumnoAsignadoATarea(TareaEntity tarea, Long alumnoId) {
         // Si la tarea es para todos los alumnos del curso

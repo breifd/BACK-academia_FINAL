@@ -5,7 +5,6 @@ import com.example.academia.DTOs.Created.UsuarioCreateDTO;
 import com.example.academia.DTOs.Response.ProfesorResponseDTO;
 import com.example.academia.DTOs.SimpleDTO.CursoSimpleDTO;
 import com.example.academia.Exceptions.ValidationException;
-import com.example.academia.entidades.CursoEntity;
 import com.example.academia.entidades.ProfesorEntity;
 import com.example.academia.entidades.UsuarioEntity;
 import com.example.academia.mappers.CursoMapper;
@@ -20,7 +19,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +37,7 @@ public class ProfesorServiceImpl implements ProfesorService {
     private final CursoRepository cursoRepository;
     private final ProfesorMapper profesorMapper;
     private final CursoMapper cursoMapper;
+    private final PasswordEncoder passwordEncoder;
 
     private Pageable createPageable(int page, int size, String sort, String direction) {
         Sort.Direction sortDirection = direction.equalsIgnoreCase("desc") ? Sort.Direction.DESC : Sort.Direction.ASC;
@@ -91,6 +93,7 @@ public class ProfesorServiceImpl implements ProfesorService {
     }
 
     @Override
+    @Transactional
     public ProfesorResponseDTO updateProfesor(Long id, ProfesorCreateDTO profesor, boolean syncUsuario) {
         Optional<ProfesorEntity> profesorEntity = profesorRepository.findById(id);
         if (profesorEntity.isEmpty()) {
@@ -116,49 +119,93 @@ public class ProfesorServiceImpl implements ProfesorService {
     }
 
     @Override
+    @Transactional
     public ProfesorResponseDTO createProfesorWithUser(ProfesorCreateDTO profesorDTO) {
-        // Guardamos el profesor
-        ProfesorEntity profesorE = profesorMapper.toProfesorEntity(profesorDTO);
-        ProfesorEntity profesorActual = profesorRepository.save(profesorE);
+        try {
+            // PASO 1: Crear y guardar el profesor (sin relaciones)
+            ProfesorEntity profesorE = profesorMapper.toProfesorEntity(profesorDTO);
+            ProfesorEntity profesorGuardado = profesorRepository.save(profesorE);
 
-        // Solo creamos usuario si se incluye en el DTO
-        if (profesorDTO.getUsuario() != null) {
-            UsuarioCreateDTO usuarioDTO = profesorDTO.getUsuario();
+            // PASO 2: Crear usuario asociado si se proporciona
+            if (profesorDTO.getUsuario() != null) {
+                UsuarioCreateDTO usuarioDTO = profesorDTO.getUsuario();
 
-            UsuarioEntity usuario = new UsuarioEntity();
-            usuario.setUsername(usuarioDTO.getUsername());
-            usuario.setPassword(usuarioDTO.getPassword());
-            usuario.setRol(UsuarioEntity.Rol.Profesor);
-            usuario.setProfesor(profesorActual);
+                // Validar datos de usuario
+                if (usuarioDTO.getUsername() == null || usuarioDTO.getUsername().trim().isEmpty()) {
+                    throw new ValidationException("El nombre de usuario es obligatorio");
+                }
+                if (usuarioDTO.getPassword() == null || usuarioDTO.getPassword().trim().isEmpty()) {
+                    throw new ValidationException("La contraseña es obligatoria");
+                }
 
-            // Copiar nombre/apellido del profesor si no están definidos en el usuario
-            usuario.setNombre(usuarioDTO.getNombre() != null ? usuarioDTO.getNombre() : profesorDTO.getNombre());
-            usuario.setApellido(usuarioDTO.getApellido() != null ? usuarioDTO.getApellido() : profesorDTO.getApellido());
+                // Verificar que el username no esté en uso
+                if (usuarioRepository.existsByUsername(usuarioDTO.getUsername())) {
+                    throw new ValidationException("El nombre de usuario '" + usuarioDTO.getUsername() + "' ya está en uso");
+                }
 
-            usuarioValidator.validateRolRelations(usuario);
-            usuarioRepository.save(usuario);
+                // Crear usuario manualmente (no usar mapper para evitar problemas de relaciones)
+                UsuarioEntity usuario = new UsuarioEntity();
+                usuario.setUsername(usuarioDTO.getUsername());
+                usuario.setPassword(passwordEncoder.encode(usuarioDTO.getPassword())); // Encriptar contraseña
+                usuario.setRol(UsuarioEntity.Rol.Profesor);
+
+                // Configurar nombre y apellido
+                usuario.setNombre(usuarioDTO.getNombre() != null && !usuarioDTO.getNombre().trim().isEmpty()
+                        ? usuarioDTO.getNombre() : profesorDTO.getNombre());
+                usuario.setApellido(usuarioDTO.getApellido() != null && !usuarioDTO.getApellido().trim().isEmpty()
+                        ? usuarioDTO.getApellido() : profesorDTO.getApellido());
+
+                // IMPORTANTE: Establecer la relación con la entidad MANAGED
+                usuario.setProfesor(profesorGuardado);
+
+                // Validar relaciones antes de guardar
+                usuarioValidator.validateRolRelations(usuario);
+
+                // Guardar usuario
+                UsuarioEntity usuarioGuardado = usuarioRepository.save(usuario);
+
+                System.out.println("✅ Usuario creado exitosamente: " + usuarioGuardado.getUsername());
+            }
+
+            return profesorMapper.toProfesorResponseDTO(profesorGuardado);
+
+        } catch (ValidationException e) {
+            System.err.println("❌ Error de validación: " + e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            System.err.println("❌ Error inesperado al crear profesor con usuario: " + e.getMessage());
+            e.printStackTrace();
+            throw new ValidationException("Error al crear profesor: " + e.getMessage());
+        }
+    }
+
+
+    @Override
+    @Transactional
+    public ProfesorResponseDTO saveProfesor(ProfesorCreateDTO profesorDTO) {
+        // CAMBIO: Ahora siempre requiere datos de usuario
+        if (profesorDTO.getUsuario() == null) {
+            throw new ValidationException("Los datos de usuario son obligatorios para crear un profesor");
         }
 
-        return profesorMapper.toProfesorResponseDTO(profesorActual);
+        return createProfesorWithUser(profesorDTO);
     }
 
     @Override
-    public ProfesorResponseDTO saveProfesor(ProfesorCreateDTO profesor) {
-        ProfesorEntity profesorEntity = profesorMapper.toProfesorEntity(profesor);
-        ProfesorEntity savedProfesor = profesorRepository.save(profesorEntity);
-        return profesorMapper.toProfesorResponseDTO(savedProfesor);
-    }
-
-    @Override
+    @Transactional
     public void deleteProfesor(Long id) {
-        // Primero miramos si está relacionado con el usuario y eliminamos la relación
+        // Verificar que el profesor existe
+        if (!profesorRepository.existsById(id)) {
+            throw new ValidationException("No existe ningún profesor con id " + id);
+        }
+
+        // Eliminar usuario asociado si existe
         Optional<UsuarioEntity> usuarioOpt = usuarioRepository.findByProfesorId(id);
         if (usuarioOpt.isPresent()) {
-            UsuarioEntity usuario = usuarioOpt.get();
-            usuario.setProfesor(null);
-            usuarioRepository.save(usuario);
+            usuarioRepository.delete(usuarioOpt.get());
         }
 
+        // Eliminar profesor
         profesorRepository.deleteById(id);
     }
 

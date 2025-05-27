@@ -15,11 +15,14 @@ public interface TareaMapper {
     TareaSimpleDTO toTareaSimpleDTO(TareaEntity tarea);
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "curso", ignore = true)    // 🔥 CRÍTICO
+    @Mapping(target = "profesor", ignore = true) // 🔥 CRÍTICO
+    @Mapping(target = "alumnosAsignados", ignore = true) // 🔥 CRÍTICO
     @Mapping(target = "documento", ignore = true)
     @Mapping(target = "nombreDocumento", ignore = true)
     @Mapping(target = "tipoDocumento", ignore = true)
     @Mapping(target = "entregas", ignore = true)
-    TareaEntity toTareaEntity(TareaDTO dto);
+    TareaEntity toTareaEntityWithoutRelations(TareaDTO dto);
 
     List<TareaResponseDTO> toTareaResponseDTOList(List<TareaEntity> tareas);
     List<TareaSimpleDTO> toTareaSimpleDTOList(List<TareaEntity> tareas);

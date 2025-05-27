@@ -44,7 +44,7 @@ public class TareaEntity {
 
 
     @Lob
-    @Column(name="documento", columnDefinition = "LONGBLOB")
+    @Column(name = "documento", columnDefinition = "LONGBLOB")
     private byte[] documento;
 
 
@@ -79,7 +79,7 @@ public class TareaEntity {
     private Set<AlumnoEntity> alumnosAsignados = new HashSet<>();
 
     // Relación inversa con las entregas
-    @OneToMany(mappedBy = "tarea", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "tarea", cascade = {CascadeType.REMOVE}, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonIgnore
     private Set<EntregaEntity> entregas = new HashSet<>();
 }

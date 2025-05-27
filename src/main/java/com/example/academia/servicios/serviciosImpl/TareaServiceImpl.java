@@ -95,7 +95,7 @@ public class TareaServiceImpl implements TareaService {
 
     @Override
     public TareaResponseDTO saveTarea(TareaDTO tarea) {
-        TareaEntity tareaEntity = tareaMapper.toTareaEntity(tarea);
+        TareaEntity tareaEntity = tareaMapper.toTareaEntityWithoutRelations(tarea);
         validarFechas(tareaEntity);
 
         // Si tiene ID, es una actualización y necesitamos mantener el documento existente
@@ -200,12 +200,16 @@ public class TareaServiceImpl implements TareaService {
             throw new ValidationException("El profesor no imparte en este curso");
         }
 
-        // Crear la tarea
-        TareaEntity tarea = tareaMapper.toTareaEntity(tareaDTO);
-        tarea.setProfesor(profesor);
-        tarea.setCurso(curso);
+        // ✅ SOLUCIÓN: Crear la tarea MANUALMENTE, NO usar mapper
+        TareaEntity tarea = new TareaEntity();
+        tarea.setNombre(tareaDTO.getNombre());
+        tarea.setDescripcion(tareaDTO.getDescripcion());
         tarea.setFechaPublicacion(tareaDTO.getFechaPublicacion() != null ?
                 tareaDTO.getFechaPublicacion() : LocalDate.now());
+        tarea.setFechaLimite(tareaDTO.getFechaLimite());
+        tarea.setCurso(curso);     // Usar entidades MANAGED
+        tarea.setProfesor(profesor); // Usar entidades MANAGED
+        tarea.setParaTodosLosAlumnos(tareaDTO.getParaTodosLosAlumnos());
 
         validarFechas(tarea);
 
@@ -215,6 +219,7 @@ public class TareaServiceImpl implements TareaService {
 
             Set<AlumnoEntity> alumnosAsignados = new HashSet<>();
             for (Long alumnoId : tareaDTO.getAlumnosIds()) {
+                // IMPORTANTE: Obtener entidades MANAGED
                 AlumnoEntity alumno = alumnoRepository.findById(alumnoId)
                         .orElseThrow(() -> new ValidationException("Alumno no encontrado con ID: " + alumnoId));
 

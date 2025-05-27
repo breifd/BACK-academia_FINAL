@@ -13,6 +13,9 @@ public interface ProfesorMapper {
     ProfesorResponseDTO toProfesorResponseDTO(ProfesorEntity profesor);
 
     @Mapping(target = "id", ignore = true)
+    @Mapping(target = "usuario", ignore = true)  // ✅ IGNORAR relación usuario
+    @Mapping(target = "cursos", ignore = true)   // ✅ IGNORAR relación cursos
+    @Mapping(target = "tareas", ignore = true)   // ✅ IGNORAR relación tareas
     ProfesorEntity toProfesorEntity(ProfesorCreateDTO dto);
 
     ProfesorSimpleDTO toProfesorSimpleDTO(ProfesorEntity profesor);

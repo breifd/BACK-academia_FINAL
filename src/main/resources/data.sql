@@ -57,34 +57,32 @@ INSERT INTO alumnos (id, nombre, apellido, fecha_nacimiento, telefono, email, di
 
 -- Usuario Administrador
 INSERT INTO usuarios (id, username, password, nombre, apellido, rol, profesor_id, alumno_id) VALUES
-    (1, 'admin', 'admin123', 'Administrador', 'Sistema', 'Admin', NULL, NULL);
+-- Usuario Administrador (password: admin123)
+(1, 'admin', '$2a$10$7QwWKn9h5.Z3B5K3R7TfI.oR4cjpGZoN0Q6I4p0Iw5m6FJ7G0zF6K', 'Administrador', 'Sistema', 'Admin', NULL, NULL),
 
--- Usuarios Profesores
-INSERT INTO usuarios (id, username, password, nombre, apellido, rol, profesor_id, alumno_id) VALUES
-                                                                                                 (2, 'carlos.martinez', 'prof123', 'Carlos', 'Martínez', 'Profesor', 1, NULL),
-                                                                                                 (3, 'ana.garcia', 'prof123', 'Ana', 'García', 'Profesor', 2, NULL),
-                                                                                                 (4, 'miguel.lopez', 'prof123', 'Miguel', 'López', 'Profesor', 3, NULL),
-                                                                                                 (5, 'laura.fernandez', 'prof123', 'Laura', 'Fernández', 'Profesor', 4, NULL),
-                                                                                                 (6, 'david.rodriguez', 'prof123', 'David', 'Rodríguez', 'Profesor', 5, NULL),
-                                                                                                 (7, 'maria.sanchez', 'prof123', 'María', 'Sánchez', 'Profesor', 6, NULL),
-                                                                                                 (8, 'javier.torres', 'prof123', 'Javier', 'Torres', 'Profesor', 7, NULL),
-                                                                                                 (9, 'carmen.ruiz', 'prof123', 'Carmen', 'Ruiz', 'Profesor', 8, NULL),
-                                                                                                 (10, 'antonio.moreno', 'prof123', 'Antonio', 'Moreno', 'Profesor', 9, NULL),
-                                                                                                 (11, 'elena.jimenez', 'prof123', 'Elena', 'Jiménez', 'Profesor', 10, NULL);
+-- Usuarios Profesores (password: prof123)
+(2, 'carlos.martinez', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36ESvNqSmvt6VW7ZlEJ3P4a', 'Carlos', 'Martínez', 'Profesor', 1, NULL),
+(3, 'ana.garcia', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36ESvNqSmvt6VW7ZlEJ3P4a', 'Ana', 'García', 'Profesor', 2, NULL),
+(4, 'miguel.lopez', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36ESvNqSmvt6VW7ZlEJ3P4a', 'Miguel', 'López', 'Profesor', 3, NULL),
+(5, 'laura.fernandez', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36ESvNqSmvt6VW7ZlEJ3P4a', 'Laura', 'Fernández', 'Profesor', 4, NULL),
+(6, 'david.rodriguez', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36ESvNqSmvt6VW7ZlEJ3P4a', 'David', 'Rodríguez', 'Profesor', 5, NULL),
+(7, 'maria.sanchez', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36ESvNqSmvt6VW7ZlEJ3P4a', 'María', 'Sánchez', 'Profesor', 6, NULL),
+(8, 'javier.torres', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36ESvNqSmvt6VW7ZlEJ3P4a', 'Javier', 'Torres', 'Profesor', 7, NULL),
+(9, 'carmen.ruiz', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36ESvNqSmvt6VW7ZlEJ3P4a', 'Carmen', 'Ruiz', 'Profesor', 8, NULL),
+(10, 'antonio.moreno', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36ESvNqSmvt6VW7ZlEJ3P4a', 'Antonio', 'Moreno', 'Profesor', 9, NULL),
+(11, 'elena.jimenez', '$2a$10$EixZaYVK1fsbw1ZfbX3OXePaWxn96p36ESvNqSmvt6VW7ZlEJ3P4a', 'Elena', 'Jiménez', 'Profesor', 10, NULL),
 
--- Usuarios Alumnos (algunos ejemplos)
-INSERT INTO usuarios (id, username, password, nombre, apellido, rol, profesor_id, alumno_id) VALUES
-                                                                                                 (12, 'pablo.gonzalez', 'alumno123', 'Pablo', 'González', 'Alumno', NULL, 1),
-                                                                                                 (13, 'lucia.hernandez', 'alumno123', 'Lucía', 'Hernández', 'Alumno', NULL, 2),
-                                                                                                 (14, 'alejandro.munoz', 'alumno123', 'Alejandro', 'Muñoz', 'Alumno', NULL, 3),
-                                                                                                 (15, 'sara.alvarez', 'alumno123', 'Sara', 'Álvarez', 'Alumno', NULL, 4),
-                                                                                                 (16, 'diego.vargas', 'alumno123', 'Diego', 'Vargas', 'Alumno', NULL, 5),
-                                                                                                 (17, 'andrea.castro', 'alumno123', 'Andrea', 'Castro', 'Alumno', NULL, 6),
-                                                                                                 (18, 'raul.ortega', 'alumno123', 'Raúl', 'Ortega', 'Alumno', NULL, 7),
-                                                                                                 (19, 'natalia.ramos', 'alumno123', 'Natalia', 'Ramos', 'Alumno', NULL, 8),
-                                                                                                 (20, 'ivan.guerrero', 'alumno123', 'Iván', 'Guerrero', 'Alumno', NULL, 9),
-                                                                                                 (21, 'marta.rubio', 'alumno123', 'Marta', 'Rubio', 'Alumno', NULL, 10);
-
+-- Usuarios Alumnos (password: alumno123)
+(12, 'pablo.gonzalez', '$2a$10$OqWzkz5uRxo8x9RzpK7v6eyyy2G/d7Gqg5Rm.Pj0zflDqCSlG3V7S', 'Pablo', 'González', 'Alumno', NULL, 1),
+(13, 'lucia.hernandez', '$2a$10$OqWzkz5uRxo8x9RzpK7v6eyyy2G/d7Gqg5Rm.Pj0zflDqCSlG3V7S', 'Lucía', 'Hernández', 'Alumno', NULL, 2),
+(14, 'alejandro.munoz', '$2a$10$OqWzkz5uRxo8x9RzpK7v6eyyy2G/d7Gqg5Rm.Pj0zflDqCSlG3V7S', 'Alejandro', 'Muñoz', 'Alumno', NULL, 3),
+(15, 'sara.alvarez', '$2a$10$OqWzkz5uRxo8x9RzpK7v6eyyy2G/d7Gqg5Rm.Pj0zflDqCSlG3V7S', 'Sara', 'Álvarez', 'Alumno', NULL, 4),
+(16, 'diego.vargas', '$2a$10$OqWzkz5uRxo8x9RzpK7v6eyyy2G/d7Gqg5Rm.Pj0zflDqCSlG3V7S', 'Diego', 'Vargas', 'Alumno', NULL, 5),
+(17, 'andrea.castro', '$2a$10$OqWzkz5uRxo8x9RzpK7v6eyyy2G/d7Gqg5Rm.Pj0zflDqCSlG3V7S', 'Andrea', 'Castro', 'Alumno', NULL, 6),
+(18, 'raul.ortega', '$2a$10$OqWzkz5uRxo8x9RzpK7v6eyyy2G/d7Gqg5Rm.Pj0zflDqCSlG3V7S', 'Raúl', 'Ortega', 'Alumno', NULL, 7),
+(19, 'natalia.ramos', '$2a$10$OqWzkz5uRxo8x9RzpK7v6eyyy2G/d7Gqg5Rm.Pj0zflDqCSlG3V7S', 'Natalia', 'Ramos', 'Alumno', NULL, 8),
+(20, 'ivan.guerrero', '$2a$10$OqWzkz5uRxo8x9RzpK7v6eyyy2G/d7Gqg5Rm.Pj0zflDqCSlG3V7S', 'Iván', 'Guerrero', 'Alumno', NULL, 9),
+(21, 'marta.rubio', '$2a$10$OqWzkz5uRxo8x9RzpK7v6eyyy2G/d7Gqg5Rm.Pj0zflDqCSlG3V7S', 'Marta', 'Rubio', 'Alumno', NULL, 10);
 -- ===================================================
 -- 4. INSERTAR CURSOS
 -- ===================================================
