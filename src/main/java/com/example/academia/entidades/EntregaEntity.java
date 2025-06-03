@@ -58,4 +58,16 @@ public class EntregaEntity {
     @Column(name = "comentarios")
     private String comentarios;
 
+    // Agregar estos campos después de los campos existentes de documento
+    @Lob
+    @Column(name = "documento_profesor", columnDefinition = "LONGBLOB")
+    private byte[] documentoProfesor;
+
+    @Column(name = "nombre_documento_profesor")
+    private String nombreDocumentoProfesor;
+
+    @Column(name = "tipo_documento_profesor")
+    private String tipoDocumentoProfesor;
+
+
 }

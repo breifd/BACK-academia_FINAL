@@ -62,4 +62,6 @@ public interface TareaService {
 
     // Validar que un alumno está matriculado en el curso de una tarea
     boolean validarAlumnoCurso(Long alumnoId, Long cursoId);
+
+    TareaResponseDTO createTareaConDocumento(TareaDTO tareaDTO, Long profesorId, MultipartFile documento) throws IOException;
 }

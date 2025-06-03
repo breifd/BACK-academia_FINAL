@@ -5,11 +5,14 @@ import com.example.academia.DTOs.DocumentoDTO;
 import com.example.academia.DTOs.Created.EntregaCreateDTO;
 import com.example.academia.DTOs.Response.EntregaResponseDTO;
 import com.example.academia.DTOs.SimpleDTO.EntregaSimpleDTO;
+import com.example.academia.entidades.AlumnoEntity;
 import com.example.academia.entidades.EntregaEntity;
+import com.example.academia.entidades.TareaEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Optional;
 
 public interface EntregaService {
@@ -19,6 +22,7 @@ public interface EntregaService {
     // Obtener una entrega por su ID
     Optional<EntregaResponseDTO> findById(Long id);
 
+    Page <EntregaResponseDTO> findEntregasByProfesor (Long profesorId, int page, int size, String sort, String direction);
     // Guardar una entrega
     EntregaResponseDTO saveEntrega(EntregaCreateDTO entrega);
 
@@ -58,7 +62,13 @@ public interface EntregaService {
     // Obtener nota media de entregas para una tarea
     Double getNotaMediaByTarea(Long tareaId);
 
+    EntregaResponseDTO calificarEntregaConDocumento(Long entregaId, CalificacionDTO calificacionDTO, Long profesorId, MultipartFile documentoProfesor) throws IOException;
+
+    DocumentoDTO downloadDocumentoProfesor(Long entregaId);
+
     // -- Operaciones de documentos -- //
+
+    Long getProfesorIdFromEntrega(Long entregaId);
 
     // Subir documento para una entrega
     EntregaResponseDTO uploadDocumento(Long entregaId, MultipartFile file, Long alumnoId) throws IOException;
@@ -66,7 +76,14 @@ public interface EntregaService {
     // Descargar documento de una entrega
     DocumentoDTO downloadDocumento(Long entregaId);
 
+    EntregaResponseDTO updateEntrega(Long entregaId, EntregaCreateDTO entregaDTO, Long alumnoId);
+
+    void generarEntregasAutomaticasPorVencimiento();
+
+    void generarEntregasVencidaParaTarea(TareaEntity tarea);
     // -- Métodos de validación -- //
+
+    Page<EntregaResponseDTO> findByProfesor(Long profesorId, int page, int size, String sort, String direction);
 
     // Validar que una entrega pertenece a un alumno
     boolean validarEntregaAlumno(Long entregaId, Long alumnoId);

@@ -9,6 +9,7 @@ import com.example.academia.Exceptions.ValidationException;
 import com.example.academia.entidades.UsuarioEntity;
 import com.example.academia.servicios.TareaService;
 import com.example.academia.servicios.UsuarioService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
@@ -34,6 +35,7 @@ public class TareaController {
 
     private final TareaService tareaService;
     private final UsuarioService usuarioService;
+    private final  ObjectMapper objectMapper;
 
     @GetMapping
     public ResponseEntity<Page<TareaResponseDTO>> getAllTareas(
@@ -160,6 +162,46 @@ public class TareaController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/crear-con-documento")
+    public ResponseEntity<?> createTareaConDocumento(
+            @RequestParam("tarea") String tareaJson,
+            @RequestParam(value = "documento", required = false) MultipartFile documento) { // CORREGIDO: era "documentox "
+        try {
+            System.out.println("🔍 === JSON RAW RECIBIDO ===");
+            System.out.println(tareaJson);
+            System.out.println("============================");
+
+            TareaDTO tareaDTO = objectMapper.readValue(tareaJson, TareaDTO.class);
+
+            System.out.println("🔍 === DTO DESERIALIZADO ===");
+            System.out.println("Nombre: " + tareaDTO.getNombre());
+            System.out.println("Para todos: " + tareaDTO.getParaTodosLosAlumnos());
+            System.out.println("Tipo de paraTodos: " + (tareaDTO.getParaTodosLosAlumnos() != null ? tareaDTO.getParaTodosLosAlumnos().getClass().getSimpleName() : "null"));
+            System.out.println("Alumnos IDs: " + tareaDTO.getAlumnosIds());
+            System.out.println("Cantidad alumnos: " + (tareaDTO.getAlumnosIds() != null ? tareaDTO.getAlumnosIds().size() : "null"));
+            System.out.println("Profesor ID: " + tareaDTO.getProfesorId());
+            System.out.println("Curso ID: " + tareaDTO.getCursoId());
+            System.out.println("Documento recibido: " + (documento != null ? documento.getOriginalFilename() : "null"));
+            System.out.println("============================");
+
+            // ✅ Usar el profesorId del DTO
+            Long profesorId = tareaDTO.getProfesorId();
+            if (profesorId == null) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "ID del profesor es obligatorio"));
+            }
+
+            TareaResponseDTO tarea = tareaService.createTareaConDocumento(tareaDTO, profesorId, documento);
+            return ResponseEntity.status(HttpStatus.CREATED).body(tarea);
+
+        } catch (Exception e) {
+            System.err.println("❌ ERROR: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error al procesar la tarea: " + e.getMessage()));
         }
     }
 

@@ -12,5 +12,7 @@ public class TareaSimpleDTO {
     private String nombre;
     private LocalDate fechaLimite;
     private Boolean paraTodosLosAlumnos;
+    private ProfesorSimpleDTO profesor;
+    private CursoSimpleDTO curso;
 }
 

@@ -9,6 +9,7 @@ import com.example.academia.Exceptions.ValidationException;
 import com.example.academia.entidades.UsuarioEntity;
 import com.example.academia.servicios.EntregaService;
 import com.example.academia.servicios.UsuarioService;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
@@ -32,6 +33,7 @@ public class EntregaController {
 
     private final EntregaService entregaService;
     private final UsuarioService usuarioService;
+    private final ObjectMapper  objectMapper;
 
     @GetMapping
     public ResponseEntity<Page<EntregaResponseDTO>> getAllEntregas(
@@ -77,8 +79,22 @@ public class EntregaController {
             @RequestParam("file") MultipartFile file) {
 
         try {
-            // ===== MODO DESARROLLO: VALIDACIONES COMENTADAS =====
-            Long alumnoId = 1L; // Valor por defecto para testing
+            // ✅ SOLUCIÓN: Obtener el alumnoId desde la entrega existente
+            Optional<EntregaResponseDTO> entregaOpt = entregaService.findById(id);
+            if (entregaOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Entrega no encontrada"));
+            }
+
+            EntregaResponseDTO entregaData = entregaOpt.get();
+            Long alumnoId = entregaData.getAlumno() != null ? entregaData.getAlumno().getId() : null;
+
+            if (alumnoId == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "No se puede identificar al alumno de la entrega"));
+            }
+
+            System.out.println("🔧 [DEBUG] Subiendo documento para entrega ID: " + id + ", alumnoId: " + alumnoId);
 
             EntregaResponseDTO entrega = entregaService.uploadDocumento(id, file, alumnoId);
             return ResponseEntity.ok(entrega);
@@ -90,23 +106,120 @@ public class EntregaController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
-
     @PostMapping("/{id}/calificar")
     public ResponseEntity<?> calificarEntrega(
             @PathVariable Long id,
             @RequestBody CalificacionDTO calificacionDTO) {
 
         try {
-            // ===== MODO DESARROLLO: VALIDACIONES COMENTADAS =====
-            Long profesorId = 1L; // Valor por defecto para testing
+            // ✅ SOLUCIÓN: Obtener el profesorId de la tarea asociada a la entrega
+            Optional<EntregaResponseDTO> entregaOpt = entregaService.findById(id);
+
+            if (entregaOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)  // ✅ CORREGIDO
+                        .body(Map.of("error", "Entrega no encontrada con ID: " + id));
+            }
+
+            EntregaResponseDTO entregaDTO = entregaOpt.get();
+            Long profesorId = entregaService.getProfesorIdFromEntrega(id);
+            // Validar que la entrega tiene tarea y profesor asociados
+            if (entregaDTO.getTarea() == null || profesorId == null) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "La entrega no tiene una tarea o profesor válido asociado"));
+            }
+
+            // ✅ OBTENER EL PROFESOR ID DE LA TAREA (no hardcoded)
+
+            System.out.println("🎯 [CALIFICAR] Calificando entrega ID: " + id + " por profesor ID: " + profesorId);
 
             EntregaResponseDTO entrega = entregaService.calificarEntrega(id, calificacionDTO, profesorId);
             return ResponseEntity.ok(entrega);
 
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            System.err.println("❌ [CALIFICAR] Error inesperado: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error interno del servidor"));
+        }
+
+    }
+
+    @PostMapping("/{id}/calificar-con-documento")
+    public ResponseEntity<?> calificarEntregaConDocumento(
+            @PathVariable Long id,
+            @RequestParam("calificacion") String calificacionJson,
+            @RequestParam(value = "documentoProfesor", required = false) MultipartFile documentoProfesor) {
+
+        try {
+            // ✅ SOLUCIÓN: Obtener el profesorId de la tarea asociada a la entrega
+            Optional<EntregaResponseDTO> entregaOpt = entregaService.findById(id);
+            if (entregaOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)  // ✅ CORREGIDO
+                        .body(Map.of("error", "Entrega no encontrada con ID: " + id));
+            }
+            EntregaResponseDTO entregaDTO = entregaOpt.get();
+            Long profesorId = entregaService.getProfesorIdFromEntrega(id);
+            // Validar que la entrega tiene tarea y profesor asociados
+            if (entregaDTO.getTarea() == null || profesorId == null) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "La entrega no tiene una tarea o profesor válido asociado"));
+            }
+
+            // ✅ OBTENER EL PROFESOR ID DE LA TAREA (no hardcoded)
+
+            System.out.println("🎯 [CALIFICAR+DOC] Calificando entrega ID: " + id + " por profesor ID: " + profesorId);
+
+            // Parsear JSON de calificación
+            ObjectMapper objectMapper = new ObjectMapper();
+            CalificacionDTO calificacionDTO = objectMapper.readValue(calificacionJson, CalificacionDTO.class);
+
+            // Llamar al service con el profesorId correcto
+            EntregaResponseDTO entrega = entregaService.calificarEntregaConDocumento(
+                    id, calificacionDTO, profesorId, documentoProfesor);
+
+            return ResponseEntity.ok(entrega);
+
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error al procesar el archivo: " + e.getMessage()));
+        } catch (ValidationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            System.err.println("❌ [CALIFICAR+DOC] Error inesperado: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error interno del servidor"));
         }
     }
+
+    // Nuevo endpoint para descargar documento del profesor
+    @GetMapping("/{id}/documento-profesor")
+    public ResponseEntity<?> downloadDocumentoProfesor(@PathVariable Long id) {
+        try {
+            // ✅ VALIDACIÓN: Verificar que el usuario actual tiene permisos
+            // (En modo desarrollo, permitir descarga a cualquiera)
+
+            DocumentoDTO documento = entregaService.downloadDocumentoProfesor(id);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType(documento.getTipoArchivo()));
+            headers.setContentDispositionFormData("attachment", documento.getNombreArchivo());
+
+            return new ResponseEntity<>(documento.getContenido(), headers, HttpStatus.OK);
+
+        } catch (ValidationException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            System.err.println("❌ [DOWNLOAD-DOC-PROF] Error inesperado: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error interno del servidor"));
+        }
+    }
+
 
     @GetMapping("/{id}/documento")
     public ResponseEntity<?> downloadDocumento(@PathVariable Long id) {
@@ -125,6 +238,38 @@ public class EntregaController {
         } catch (ValidationException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Map.of("error", e.getMessage()));
+        }
+    }
+    @GetMapping("/profesor/{profesorId}")
+    public ResponseEntity<Page<EntregaResponseDTO>> getEntregasByProfesor(
+            @PathVariable Long profesorId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "id") String sort,
+            @RequestParam(defaultValue = "asc") String direction) {
+
+        try {
+            System.out.println("🔍 [CONTROLLER] Buscando entregas del profesor: " + profesorId);
+
+            // ✅ USAR MÉTODO OPTIMIZADO que carga todas las relaciones
+            Page<EntregaResponseDTO> entregas = entregaService.findEntregasByProfesor(profesorId, page, size, sort, direction);
+
+            System.out.println("🔍 [CONTROLLER] Entregas encontradas: " + entregas.getContent().size());
+
+            // ✅ DEBUG: Verificar que las relaciones se cargan correctamente
+            if (!entregas.getContent().isEmpty()) {
+                EntregaResponseDTO primera = entregas.getContent().get(0);
+                System.out.println("🔍 [CONTROLLER] Primera entrega - Profesor de tarea: " +
+                        (primera.getTarea() != null && primera.getTarea().getProfesor() != null ?
+                                primera.getTarea().getProfesor().getId() : "NULL"));
+            }
+
+            return ResponseEntity.ok(entregas);
+        } catch (Exception e) {
+            System.err.println("❌ [CONTROLLER] Error: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body((Page<EntregaResponseDTO>) Map.of("error", e.getMessage()));
         }
     }
 
@@ -169,6 +314,36 @@ public class EntregaController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateEntrega(
+            @PathVariable Long id,
+            @RequestBody EntregaCreateDTO entregaUpdateDTO) {
+        try {
+            // Obtener la entrega existente para validar el alumno
+            Optional<EntregaResponseDTO> entregaOpt = entregaService.findById(id);
+            if (entregaOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Entrega no encontrada"));
+            }
+
+            EntregaResponseDTO entregaData = entregaOpt.get();
+            Long alumnoId = entregaData.getAlumno() != null ? entregaData.getAlumno().getId() : null;
+
+            if (alumnoId == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "No se puede identificar al alumno de la entrega"));
+            }
+
+            System.out.println("🔧 [DEBUG] Actualizando entrega ID: " + id + ", alumnoId: " + alumnoId);
+
+            EntregaResponseDTO entregaActualizada = entregaService.updateEntrega(id, entregaUpdateDTO, alumnoId);
+            return ResponseEntity.ok(entregaActualizada);
+
+        } catch (ValidationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
@@ -224,6 +399,18 @@ public class EntregaController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // ✅ NUEVO: Endpoint para generar entregas automáticas (para testing o ejecución manual)
+    @PostMapping("/generar-entregas-vencidas")
+    public ResponseEntity<?> generarEntregasVencidas() {
+        try {
+            entregaService.generarEntregasAutomaticasPorVencimiento();
+            return ResponseEntity.ok(Map.of("message", "Entregas automáticas generadas correctamente"));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error al generar entregas automáticas: " + e.getMessage()));
         }
     }
 

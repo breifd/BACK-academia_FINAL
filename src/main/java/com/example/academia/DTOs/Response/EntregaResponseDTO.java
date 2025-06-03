@@ -27,4 +27,8 @@ public class EntregaResponseDTO {
     // Metadatos útiles para el frontend
     private boolean entregadaATiempo;
     private boolean calificada;
+
+    private String nombreDocumentoProfesor;
+    private String tipoDocumentoProfesor;
+    private boolean tieneDocumentoProfesor;
 }

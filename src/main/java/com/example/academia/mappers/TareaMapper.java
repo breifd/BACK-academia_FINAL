@@ -10,8 +10,13 @@ import java.util.List;
 @Mapper(componentModel = "spring", uses = {CursoMapper.class, ProfesorMapper.class, AlumnoMapper.class})
 public interface TareaMapper {
 
+    @Mapping(target = "tieneDocumento", expression = "java(tarea.getDocumento() != null && tarea.getDocumento().length > 0)")
+    @Mapping(target = "totalEntregas", expression = "java(tarea.getEntregas() != null ? tarea.getEntregas().size() : 0)")
+    @Mapping(target = "entregasPendientes", expression = "java(tarea.getEntregas() != null ? (int) tarea.getEntregas().stream().filter(e -> e.getEstado() == com.example.academia.entidades.EntregaEntity.EstadoEntrega.ENTREGADA).count() : 0)")
     TareaResponseDTO toTareaResponseDTO(TareaEntity tarea);
 
+    @Mapping(target = "profesor", source = "profesor")
+    @Mapping(target = "curso", source = "curso")
     TareaSimpleDTO toTareaSimpleDTO(TareaEntity tarea);
 
     @Mapping(target = "id", ignore = true)

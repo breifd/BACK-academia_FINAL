@@ -282,6 +282,39 @@ public class UsuarioController {
                     .body(Map.of("error", "Error al refrescar el token"));
         }
     }
+    @PutMapping("/cambiar-password-simple")
+    public ResponseEntity<?> cambiarPasswordSimple(@RequestBody Map<String, String> request) {
+        try {
+            String username = request.get("username");
+            String passwordActual = request.get("passwordActual");
+            String passwordNueva = request.get("passwordNueva");
+
+            // Buscar usuario
+            Optional<UsuarioEntity> usuarioOpt = usuarioRepository.findByUsername(username);
+            if (usuarioOpt.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Usuario no encontrado"));
+            }
+
+            UsuarioEntity usuario = usuarioOpt.get();
+
+            // Verificar contraseña actual
+            if (!passwordEncoder.matches(passwordActual, usuario.getPassword())) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "La contraseña actual no es correcta"));
+            }
+
+            // Actualizar contraseña
+            usuario.setPassword(passwordEncoder.encode(passwordNueva));
+            usuarioRepository.save(usuario);
+
+            return ResponseEntity.ok(Map.of("success", true, "message", "Contraseña actualizada correctamente"));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error al cambiar contraseña: " + e.getMessage()));
+        }
+    }
 
 
     @ExceptionHandler(ValidationException.class)

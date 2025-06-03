@@ -18,10 +18,7 @@ import com.example.academia.repositorios.TareaRepository;
 import com.example.academia.servicios.TareaService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -52,6 +49,22 @@ public class TareaServiceImpl implements TareaService {
 
     @Override
     public Page<TareaResponseDTO> findAll(int page, int size, String sort, String direction) {
+        // Para listas grandes, usar método optimizado
+        if (size > 50) {
+            List<TareaEntity> tareas = tareaRepository.findAllWithAlumnos();
+            List<TareaResponseDTO> tareasDTO = tareas.stream()
+                    .map(tareaMapper::toTareaResponseDTO)
+                    .collect(Collectors.toList());
+
+            // Crear Page manualmente
+            int startIndex = page * size;
+            int endIndex = Math.min(startIndex + size, tareasDTO.size());
+            List<TareaResponseDTO> pageContent = tareasDTO.subList(startIndex, endIndex);
+
+            return new PageImpl<>(pageContent, PageRequest.of(page, size), tareasDTO.size());
+        }
+
+        // Para listas pequeñas, usar paginación normal
         Pageable pageable = createPageable(page, size, sort, direction);
         return tareaRepository.findAll(pageable).map(tareaMapper::toTareaResponseDTO);
     }
@@ -94,30 +107,85 @@ public class TareaServiceImpl implements TareaService {
     }
 
     @Override
+    @Transactional
     public TareaResponseDTO saveTarea(TareaDTO tarea) {
-        TareaEntity tareaEntity = tareaMapper.toTareaEntityWithoutRelations(tarea);
+        System.out.println("🔧 [SAVE TAREA] Guardando tarea ID: " + tarea.getId());
+
+        TareaEntity tareaEntity;
+
+        if (tarea.getId() != null) {
+            // ✅ ACTUALIZACIÓN: Cargar la tarea existente
+            System.out.println("🔄 [SAVE TAREA] Modo actualización - ID: " + tarea.getId());
+
+            tareaEntity = tareaRepository.findById(tarea.getId())
+                    .orElseThrow(() -> new ValidationException("Tarea no encontrada con ID: " + tarea.getId()));
+
+            // Actualizar campos básicos
+            tareaEntity.setNombre(tarea.getNombre());
+            tareaEntity.setDescripcion(tarea.getDescripcion());
+            tareaEntity.setFechaPublicacion(tarea.getFechaPublicacion());
+            tareaEntity.setFechaLimite(tarea.getFechaLimite());
+            tareaEntity.setParaTodosLosAlumnos(tarea.getParaTodosLosAlumnos());
+
+            // ✅ ACTUALIZAR CURSO si ha cambiado
+            if (tarea.getCursoId() != null && !tarea.getCursoId().equals(tareaEntity.getCurso().getId())) {
+                CursoEntity nuevoCurso = cursoRepository.findById(tarea.getCursoId())
+                        .orElseThrow(() -> new ValidationException("Curso no encontrado con ID: " + tarea.getCursoId()));
+                tareaEntity.setCurso(nuevoCurso);
+                System.out.println("📚 [SAVE TAREA] Curso actualizado a: " + nuevoCurso.getNombre());
+            }
+
+            // ✅ ACTUALIZAR ALUMNOS ASIGNADOS
+            if (Boolean.FALSE.equals(tarea.getParaTodosLosAlumnos()) &&
+                    tarea.getAlumnosIds() != null && !tarea.getAlumnosIds().isEmpty()) {
+
+                System.out.println("👥 [SAVE TAREA] Actualizando alumnos específicos: " + tarea.getAlumnosIds().size());
+
+                Set<AlumnoEntity> nuevosAlumnos = new HashSet<>();
+                for (Long alumnoId : tarea.getAlumnosIds()) {
+                    AlumnoEntity alumno = alumnoRepository.findById(alumnoId)
+                            .orElseThrow(() -> new ValidationException("Alumno no encontrado con ID: " + alumnoId));
+                    nuevosAlumnos.add(alumno);
+                }
+                tareaEntity.setAlumnosAsignados(nuevosAlumnos);
+
+            } else if (Boolean.TRUE.equals(tarea.getParaTodosLosAlumnos())) {
+                // Si es para todos, limpiar asignaciones específicas
+                tareaEntity.setAlumnosAsignados(new HashSet<>());
+                System.out.println("🌐 [SAVE TAREA] Limpiando asignaciones específicas - ahora es para todos");
+            }
+
+            // Mantener documento existente (se actualiza por separado)
+            // No tocar documento, nombreDocumento, tipoDocumento
+
+        } else {
+            // ✅ CREACIÓN: Nueva tarea
+            System.out.println("🆕 [SAVE TAREA] Modo creación");
+            tareaEntity = tareaMapper.toTareaEntityWithoutRelations(tarea);
+
+            // Establecer curso
+            if (tarea.getCursoId() != null) {
+                CursoEntity curso = cursoRepository.findById(tarea.getCursoId())
+                        .orElseThrow(() -> new ValidationException("Curso no encontrado con ID: " + tarea.getCursoId()));
+                tareaEntity.setCurso(curso);
+            }
+
+            // Establecer profesor
+            if (tarea.getProfesorId() != null) {
+                ProfesorEntity profesor = profesorRepository.findById(tarea.getProfesorId())
+                        .orElseThrow(() -> new ValidationException("Profesor no encontrado con ID: " + tarea.getProfesorId()));
+                tareaEntity.setProfesor(profesor);
+            }
+        }
+
+        // Validar fechas
         validarFechas(tareaEntity);
 
-        // Si tiene ID, es una actualización y necesitamos mantener el documento existente
-        if (tarea.getId() != null) {
-            Optional<TareaEntity> tareaExistente = tareaRepository.findById(tarea.getId());
-            if (tareaExistente.isPresent() && tareaExistente.get().getDocumento() != null) {
-                tareaEntity.setDocumento(tareaExistente.get().getDocumento());
-                tareaEntity.setNombreDocumento(tareaExistente.get().getNombreDocumento());
-                tareaEntity.setTipoDocumento(tareaExistente.get().getTipoDocumento());
-            }
-        }
-
+        // Guardar
         TareaEntity savedTarea = tareaRepository.save(tareaEntity);
-        return tareaMapper.toTareaResponseDTO(savedTarea);
-    }
+        System.out.println("✅ [SAVE TAREA] Tarea guardada correctamente - ID: " + savedTarea.getId());
 
-    private void validarFechas(TareaEntity tarea) {
-        if (tarea.getFechaPublicacion() != null && tarea.getFechaLimite() != null) {
-            if (tarea.getFechaLimite().isBefore(tarea.getFechaPublicacion())) {
-                throw new ValidationException("La fecha límite no puede ser anterior a la fecha de publicación");
-            }
-        }
+        return tareaMapper.toTareaResponseDTO(savedTarea);
     }
 
     @Override
@@ -157,6 +225,22 @@ public class TareaServiceImpl implements TareaService {
 
     @Override
     public Page<TareaResponseDTO> findTareasProfesor(Long profesorId, int page, int size, String sort, String direction) {
+        // Para listas grandes, usar método optimizado sin paginación
+        if (size > 50) {
+            List<TareaEntity> tareas = tareaRepository.findByProfesorIdWithAlumnos(profesorId);
+            List<TareaResponseDTO> tareasDTO = tareas.stream()
+                    .map(tareaMapper::toTareaResponseDTO)
+                    .collect(Collectors.toList());
+
+            // Crear Page manualmente
+            int startIndex = page * size;
+            int endIndex = Math.min(startIndex + size, tareasDTO.size());
+            List<TareaResponseDTO> pageContent = tareasDTO.subList(startIndex, endIndex);
+
+            return new PageImpl<>(pageContent, PageRequest.of(page, size), tareasDTO.size());
+        }
+
+        // Para listas pequeñas, usar paginación normal
         Pageable pageable = createPageable(page, size, sort, direction);
         return tareaRepository.findByProfesorId(profesorId, pageable)
                 .map(tareaMapper::toTareaResponseDTO);
@@ -171,6 +255,22 @@ public class TareaServiceImpl implements TareaService {
 
     @Override
     public Page<TareaResponseDTO> findTareasAlumno(Long alumnoId, int page, int size, String sort, String direction) {
+        // Para listas grandes, usar método optimizado
+        if (size > 50) {
+            List<TareaEntity> tareas = tareaRepository.findTareasForAlumnoWithAlumnos(alumnoId);
+            List<TareaResponseDTO> tareasDTO = tareas.stream()
+                    .map(tareaMapper::toTareaResponseDTO)
+                    .collect(Collectors.toList());
+
+            // Crear Page manualmente
+            int startIndex = page * size;
+            int endIndex = Math.min(startIndex + size, tareasDTO.size());
+            List<TareaResponseDTO> pageContent = tareasDTO.subList(startIndex, endIndex);
+
+            return new PageImpl<>(pageContent, PageRequest.of(page, size), tareasDTO.size());
+        }
+
+        // Para listas pequeñas, usar paginación normal
         Pageable pageable = createPageable(page, size, sort, direction);
         return tareaRepository.findTareasForAlumno(alumnoId, pageable)
                 .map(tareaMapper::toTareaResponseDTO);
@@ -186,62 +286,80 @@ public class TareaServiceImpl implements TareaService {
     @Override
     @Transactional
     public TareaResponseDTO createTarea(TareaDTO tareaDTO, Long profesorId) {
+        System.out.println("🔍 === INICIO createTarea OPTIMIZADO ===");
+        System.out.println("Profesor ID: " + profesorId);
+        System.out.println("Para todos: " + tareaDTO.getParaTodosLosAlumnos());
+        System.out.println("Alumnos IDs: " + tareaDTO.getAlumnosIds());
+
         ProfesorEntity profesor = profesorRepository.findById(profesorId)
                 .orElseThrow(() -> new ValidationException("Profesor no encontrado con ID: " + profesorId));
 
         CursoEntity curso = cursoRepository.findById(tareaDTO.getCursoId())
                 .orElseThrow(() -> new ValidationException("Curso no encontrado con ID: " + tareaDTO.getCursoId()));
 
-        // ===== MODO DESARROLLO: VALIDACIÓN COMENTADA =====
-        // Comprobar si el profesor está en el curso - DESACTIVADO EN DESARROLLO
-        /*
-        boolean profesorEnCurso = curso.getProfesores().stream()
-                .anyMatch(p -> p.getId().equals(profesorId));
-
-        if (!profesorEnCurso) {
-            throw new ValidationException("El profesor no imparte en este curso");
-        }
-        */
-
-        // ✅ SOLUCIÓN: Crear la tarea MANUALMENTE, NO usar mapper
+        // ✅ CREAR LA TAREA MANUALMENTE
         TareaEntity tarea = new TareaEntity();
         tarea.setNombre(tareaDTO.getNombre());
         tarea.setDescripcion(tareaDTO.getDescripcion());
         tarea.setFechaPublicacion(tareaDTO.getFechaPublicacion() != null ?
                 tareaDTO.getFechaPublicacion() : LocalDate.now());
         tarea.setFechaLimite(tareaDTO.getFechaLimite());
-        tarea.setCurso(curso);     // Usar entidades MANAGED
-        tarea.setProfesor(profesor); // Usar entidades MANAGED
+        tarea.setCurso(curso);
+        tarea.setProfesor(profesor);
         tarea.setParaTodosLosAlumnos(tareaDTO.getParaTodosLosAlumnos());
 
         validarFechas(tarea);
+
+        System.out.println("🔍 Tarea configurada - paraTodos: " + tarea.getParaTodosLosAlumnos());
 
         // Si la tarea no es para todos, asignar alumnos específicos
         if (Boolean.FALSE.equals(tareaDTO.getParaTodosLosAlumnos()) &&
                 tareaDTO.getAlumnosIds() != null && !tareaDTO.getAlumnosIds().isEmpty()) {
 
+            System.out.println("🎯 ASIGNACIÓN ESPECÍFICA - Procesando " + tareaDTO.getAlumnosIds().size() + " alumnos");
+
             Set<AlumnoEntity> alumnosAsignados = new HashSet<>();
             for (Long alumnoId : tareaDTO.getAlumnosIds()) {
-                // IMPORTANTE: Obtener entidades MANAGED
+                System.out.println("  📌 Procesando alumno ID: " + alumnoId);
+
                 AlumnoEntity alumno = alumnoRepository.findById(alumnoId)
                         .orElseThrow(() -> new ValidationException("Alumno no encontrado con ID: " + alumnoId));
 
-                // ===== MODO DESARROLLO: VALIDACIÓN COMENTADA =====
-                // Validar que el alumno esté en el curso - DESACTIVADO EN DESARROLLO
-                /*
-                if (!validarAlumnoCurso(alumnoId, curso.getId())) {
-                    throw new ValidationException("El alumno con ID " + alumnoId + " no está matriculado en el curso");
-                }
-                */
-
                 alumnosAsignados.add(alumno);
+                System.out.println("  ✅ Alumno agregado: " + alumno.getNombre() + " " + alumno.getApellido() + " (ID: " + alumno.getId() + ")");
             }
 
             tarea.setAlumnosAsignados(alumnosAsignados);
+            System.out.println("✅ Total alumnos asignados específicamente: " + alumnosAsignados.size());
+        } else {
+            System.out.println("🌐 ASIGNACIÓN GLOBAL - Para todos los alumnos del curso");
         }
 
         TareaEntity savedTarea = tareaRepository.save(tarea);
+        System.out.println("💾 Tarea guardada con ID: " + savedTarea.getId());
+
+        // ✅ VERIFICACIÓN POST-GUARDADO
+        System.out.println("🔍 === VERIFICACIÓN POST-GUARDADO ===");
+        System.out.println("ID: " + savedTarea.getId());
+        System.out.println("ParaTodos: " + savedTarea.getParaTodosLosAlumnos());
+        System.out.println("AlumnosAsignados count: " + (savedTarea.getAlumnosAsignados() != null ? savedTarea.getAlumnosAsignados().size() : 0));
+
+        if (savedTarea.getAlumnosAsignados() != null) {
+            for (AlumnoEntity alumno : savedTarea.getAlumnosAsignados()) {
+                System.out.println("  - " + alumno.getNombre() + " " + alumno.getApellido() + " (ID: " + alumno.getId() + ")");
+            }
+        }
+        System.out.println("=====================================");
+
         return tareaMapper.toTareaResponseDTO(savedTarea);
+    }
+
+    private void validarFechas(TareaEntity tarea) {
+        if (tarea.getFechaPublicacion() != null && tarea.getFechaLimite() != null) {
+            if (tarea.getFechaLimite().isBefore(tarea.getFechaPublicacion())) {
+                throw new ValidationException("La fecha límite no puede ser anterior a la fecha de publicación");
+            }
+        }
     }
 
     @Override
@@ -323,5 +441,49 @@ public class TareaServiceImpl implements TareaService {
 
         return curso.get().getAlumnos().stream()
                 .anyMatch(alumno -> alumno.getId().equals(alumnoId));
+    }
+
+    public void debugTareaAsignacion(Long tareaId) {
+        TareaEntity tarea = tareaRepository.findById(tareaId)
+                .orElseThrow(() -> new ValidationException("Tarea no encontrada"));
+
+        System.out.println("=== DEBUG TAREA ASIGNACIÓN ===");
+        System.out.println("Tarea ID: " + tarea.getId());
+        System.out.println("Nombre: " + tarea.getNombre());
+        System.out.println("Para todos: " + tarea.getParaTodosLosAlumnos());
+        System.out.println("Alumnos asignados: " + tarea.getAlumnosAsignados().size());
+
+        if (!tarea.getParaTodosLosAlumnos()) {
+            tarea.getAlumnosAsignados().forEach(alumno ->
+                    System.out.println("- " + alumno.getNombre() + " " + alumno.getApellido() + " (ID: " + alumno.getId() + ")"));
+        }
+
+        System.out.println("Alumnos del curso: " + tarea.getCurso().getAlumnos().size());
+        tarea.getCurso().getAlumnos().forEach(alumno ->
+                System.out.println("- " + alumno.getNombre() + " " + alumno.getApellido() + " (ID: " + alumno.getId() + ")"));
+
+        System.out.println("===============================");
+    }
+
+    @Override
+    @Transactional
+    public TareaResponseDTO createTareaConDocumento(TareaDTO tareaDTO, Long profesorId, MultipartFile documento) throws IOException {
+        // Crear la tarea usando el método existente
+        TareaResponseDTO tareaCreada = this.createTarea(tareaDTO, profesorId);
+
+        // Si hay documento, agregarlo a la tarea recién creada
+        if (documento != null && !documento.isEmpty()) {
+            TareaEntity tarea = tareaRepository.findById(tareaCreada.getId())
+                    .orElseThrow(() -> new ValidationException("Tarea no encontrada después de crear"));
+
+            tarea.setDocumento(documento.getBytes());
+            tarea.setNombreDocumento(documento.getOriginalFilename());
+            tarea.setTipoDocumento(documento.getContentType());
+
+            TareaEntity tareaConDocumento = tareaRepository.save(tarea);
+            return tareaMapper.toTareaResponseDTO(tareaConDocumento);
+        }
+
+        return tareaCreada;
     }
 }

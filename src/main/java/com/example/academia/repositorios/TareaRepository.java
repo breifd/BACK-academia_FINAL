@@ -14,6 +14,40 @@ import java.util.List;
 @Repository
 public interface TareaRepository extends JpaRepository<TareaEntity, Long> {
 
+
+    // ✅ OPTIMIZACIÓN: Cargar tareas con alumnos en una sola consulta
+    @Query("SELECT DISTINCT t FROM TareaEntity t " +
+            "LEFT JOIN FETCH t.alumnosAsignados " +
+            "LEFT JOIN FETCH t.curso " +
+            "LEFT JOIN FETCH t.profesor " +
+            "WHERE t.profesor.id = :profesorId " +
+            "ORDER BY t.fechaLimite")
+    List<TareaEntity> findByProfesorIdWithAlumnos(@Param("profesorId") Long profesorId);
+
+    // ✅ OPTIMIZACIÓN: Cargar todas las tareas con relaciones
+    @Query("SELECT DISTINCT t FROM TareaEntity t " +
+            "LEFT JOIN FETCH t.alumnosAsignados " +
+            "LEFT JOIN FETCH t.curso " +
+            "LEFT JOIN FETCH t.profesor " +
+            "ORDER BY t.fechaLimite")
+    List<TareaEntity> findAllWithAlumnos();
+
+    // ✅ OPTIMIZACIÓN: Cargar tareas para alumno con relaciones
+    @Query("SELECT DISTINCT t FROM TareaEntity t " +
+            "LEFT JOIN FETCH t.alumnosAsignados " +
+            "LEFT JOIN FETCH t.curso " +
+            "LEFT JOIN FETCH t.profesor " +
+            "WHERE " +
+            "  (t.paraTodosLosAlumnos = true AND EXISTS (" +
+            "    SELECT 1 FROM t.curso.alumnos a WHERE a.id = :alumnoId" +
+            "  )) " +
+            "  OR " +
+            "  (t.paraTodosLosAlumnos = false AND EXISTS (" +
+            "    SELECT 1 FROM t.alumnosAsignados aa WHERE aa.id = :alumnoId" +
+            "  )) " +
+            "ORDER BY t.fechaLimite")
+    List<TareaEntity> findTareasForAlumnoWithAlumnos(@Param("alumnoId") Long alumnoId);
+
     Page<TareaEntity> findAll(Pageable pageable);
 
     Page<TareaEntity> findByNombreContainingIgnoreCase(String nombre, Pageable pageable);
@@ -29,8 +63,22 @@ public interface TareaRepository extends JpaRepository<TareaEntity, Long> {
     Page<TareaEntity> findByCursoIdAndProfesorId(Long cursoId, Long profesorId, Pageable pageable);
 
     //Seleccionar todas las tareas asignadas al alumno de forma que se monstraran las tareas donde el alumno está en el curso y la tarea es para todos y las suyas propias
-    @Query("SELECT DISTINCT t FROM TareaEntity t LEFT JOIN t.alumnosAsignados a WHERE (t.paraTodosLosAlumnos = true AND :alumnoId IN (SELECT a2.id FROM t.curso.alumnos a2)) OR a.id = :alumnoId")
+    @Query("SELECT DISTINCT t FROM TareaEntity t " +
+            "WHERE " +
+            "  (t.paraTodosLosAlumnos = true AND EXISTS (" +
+            "    SELECT 1 FROM t.curso.alumnos a WHERE a.id = :alumnoId" +
+            "  )) " +
+            "  OR " +
+            "  (t.paraTodosLosAlumnos = false AND EXISTS (" +
+            "    SELECT 1 FROM t.alumnosAsignados aa WHERE aa.id = :alumnoId" +
+            "  ))")
     Page<TareaEntity> findTareasForAlumno(@Param("alumnoId") Long alumnoId, Pageable pageable);
+
+    // ✅ NUEVO: Buscar tareas vencidas que no tienen entregas de algunos alumnos
+    @Query("SELECT DISTINCT t FROM TareaEntity t " +
+            "WHERE t.fechaLimite < :fecha " +
+            "AND (t.paraTodosLosAlumnos = true OR t.alumnosAsignados IS NOT EMPTY)")
+    List<TareaEntity> findTareasVencidasSinEntregas(@Param("fecha") LocalDate fecha);
 
     //Verificar que el profesor está en el mismo curso que el alumno al que quiere enviarle la tarea, sino es así devuelve false
     @Query("SELECT CASE WHEN COUNT(c) > 0 THEN true ELSE false END FROM CursoEntity c JOIN c.profesores p JOIN c.alumnos a WHERE p.id = :profesorId AND a.id = :alumnoId AND c.id = :cursoId")
