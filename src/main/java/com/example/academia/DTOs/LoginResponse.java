@@ -17,6 +17,7 @@ public class LoginResponse {
 
     private boolean success;
     private String message;
+    private Long id; // ✅ NUEVO: ID del usuario
     private String username;
     private String nombre;
     private String apellido;
@@ -28,8 +29,7 @@ public class LoginResponse {
     private String token;
     private String tokenType = "Bearer";
 
-
-    // Respuesta para el Login Exitoso CON TOKEN JWT
+    // ✅ ACTUALIZADO: Respuesta para el Login Exitoso CON TOKEN JWT
     public static LoginResponse success(String username, String nombre, String apellido,
                                         UsuarioEntity.Rol rol, Long profesorId, Long alumnoId, String token) {
         return LoginResponse.builder()
@@ -46,9 +46,27 @@ public class LoginResponse {
                 .build();
     }
 
-    // Respuesta para el Login Exitoso
-    public static LoginResponse success ( String username, String nombre, String apellido,
-    UsuarioEntity.Rol rol, Long profesorId, Long alumnoId) {
+    // ✅ NUEVO: Respuesta exitosa con ID de usuario
+    public static LoginResponse success(Long id, String username, String nombre, String apellido,
+                                        UsuarioEntity.Rol rol, Long profesorId, Long alumnoId, String token) {
+        return LoginResponse.builder()
+                .success(true)
+                .message("Login exitoso")
+                .id(id)
+                .username(username)
+                .nombre(nombre)
+                .apellido(apellido)
+                .rol(rol)
+                .profesorId(profesorId)
+                .alumnoId(alumnoId)
+                .token(token)
+                .tokenType("Bearer")
+                .build();
+    }
+
+    // ✅ ACTUALIZADO: Respuesta para el Login Exitoso SIN TOKEN
+    public static LoginResponse success(String username, String nombre, String apellido,
+                                        UsuarioEntity.Rol rol, Long profesorId, Long alumnoId) {
         return LoginResponse.builder()
                 .success(true)
                 .message("Login exitoso")
@@ -61,8 +79,23 @@ public class LoginResponse {
                 .build();
     }
 
+    // ✅ NUEVO: Respuesta exitosa con ID pero sin token
+    public static LoginResponse success(Long id, String username, String nombre, String apellido,
+                                        UsuarioEntity.Rol rol, Long profesorId, Long alumnoId) {
+        return LoginResponse.builder()
+                .success(true)
+                .message("Login exitoso")
+                .id(id)
+                .username(username)
+                .nombre(nombre)
+                .apellido(apellido)
+                .rol(rol)
+                .profesorId(profesorId)
+                .alumnoId(alumnoId)
+                .build();
+    }
 
-     //Respuesta de login fallido
+    // Respuesta de login fallido
     public static LoginResponse error(String message, String errorCode) {
         return LoginResponse.builder()
                 .success(false)
