@@ -17,42 +17,33 @@ import lombok.NoArgsConstructor;
 @EqualsAndHashCode(exclude = {"profesor", "alumno"})
 @AllArgsConstructor
 public class UsuarioEntity {
-
     public enum Rol{
         Admin, Profesor, Alumno
     }
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-
     @NotBlank
     @Size(max = 50)
     @Column(unique = true, nullable = false, name = "username")
     private String username;
-
     @NotBlank
     @Size(max = 100)
     @Column(name = "password")
     private String password;
-
     @NotBlank
     @Size(max = 100)
     private String nombre;
-
     @NotBlank
     @Size(max = 100)
     private String apellido;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "rol", nullable = false)
     private Rol rol;
-
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "profesor_id")
     @JsonIgnoreProperties({"usuario", "cursos"})
     private ProfesorEntity profesor;
-
-
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "alumno_id")
     @JsonIgnoreProperties({"usuario", "cursos"})

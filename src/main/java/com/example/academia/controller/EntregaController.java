@@ -145,6 +145,69 @@ public class EntregaController {
         }
 
     }
+    @PutMapping("/{id}/calificacion")
+    public ResponseEntity<?> editarCalificacion(
+            @PathVariable Long id,
+            @RequestBody CalificacionDTO calificacionDTO) {
+
+        try {
+            Optional<EntregaResponseDTO> entregaOpt = entregaService.findById(id);
+            if (entregaOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Entrega no encontrada con ID: " + id));
+            }
+
+            Long profesorId = entregaService.getProfesorIdFromEntrega(id);
+
+            System.out.println("🎯 [EDITAR-CALIFICACION] Editando calificación entrega ID: " + id + " por profesor ID: " + profesorId);
+
+            EntregaResponseDTO entrega = entregaService.editarCalificacion(id, calificacionDTO, profesorId);
+            return ResponseEntity.ok(entrega);
+
+        } catch (ValidationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            System.err.println("❌ [EDITAR-CALIFICACION] Error inesperado: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error interno del servidor"));
+        }
+    }
+
+    @PutMapping("/{id}/editar-calificacion")
+    public ResponseEntity<?> editarCalificacionConDocumento(
+            @PathVariable Long id,
+            @RequestParam("calificacion") String calificacionJson,
+            @RequestParam(value = "documentoProfesor", required = false) MultipartFile documentoProfesor) {
+
+        try {
+            Optional<EntregaResponseDTO> entregaOpt = entregaService.findById(id);
+            if (entregaOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Entrega no encontrada con ID: " + id));
+            }
+
+            Long profesorId = entregaService.getProfesorIdFromEntrega(id);
+
+            System.out.println("🎯 [EDITAR-CALIFICACION+DOC] Editando calificación entrega ID: " + id + " por profesor ID: " + profesorId);
+
+            CalificacionDTO calificacionDTO = objectMapper.readValue(calificacionJson, CalificacionDTO.class);
+            EntregaResponseDTO entrega = entregaService.editarCalificacionConDocumento(id, calificacionDTO, profesorId, documentoProfesor);
+
+            return ResponseEntity.ok(entrega);
+
+        } catch (IOException e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error al procesar el archivo: " + e.getMessage()));
+        } catch (ValidationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            System.err.println("❌ [EDITAR-CALIFICACION+DOC] Error inesperado: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error interno del servidor"));
+        }
+    }
 
     @PostMapping("/{id}/calificar-con-documento")
     public ResponseEntity<?> calificarEntregaConDocumento(
@@ -159,25 +222,12 @@ public class EntregaController {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND)  // ✅ CORREGIDO
                         .body(Map.of("error", "Entrega no encontrada con ID: " + id));
             }
-            EntregaResponseDTO entregaDTO = entregaOpt.get();
             Long profesorId = entregaService.getProfesorIdFromEntrega(id);
-            // Validar que la entrega tiene tarea y profesor asociados
-            if (entregaDTO.getTarea() == null || profesorId == null) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "La entrega no tiene una tarea o profesor válido asociado"));
-            }
 
-            // ✅ OBTENER EL PROFESOR ID DE LA TAREA (no hardcoded)
+            System.out.println("🎯 [EDITAR-CALIFICACION+DOC] Editando calificación entrega ID: " + id + " por profesor ID: " + profesorId);
 
-            System.out.println("🎯 [CALIFICAR+DOC] Calificando entrega ID: " + id + " por profesor ID: " + profesorId);
-
-            // Parsear JSON de calificación
-            ObjectMapper objectMapper = new ObjectMapper();
             CalificacionDTO calificacionDTO = objectMapper.readValue(calificacionJson, CalificacionDTO.class);
-
-            // Llamar al service con el profesorId correcto
-            EntregaResponseDTO entrega = entregaService.calificarEntregaConDocumento(
-                    id, calificacionDTO, profesorId, documentoProfesor);
+            EntregaResponseDTO entrega = entregaService.editarCalificacionConDocumento(id, calificacionDTO, profesorId, documentoProfesor);
 
             return ResponseEntity.ok(entrega);
 
@@ -187,7 +237,7 @@ public class EntregaController {
         } catch (ValidationException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            System.err.println("❌ [CALIFICAR+DOC] Error inesperado: " + e.getMessage());
+            System.err.println("❌ [EDITAR-CALIFICACION+DOC] Error inesperado: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Error interno del servidor"));
@@ -214,6 +264,36 @@ public class EntregaController {
                     .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             System.err.println("❌ [DOWNLOAD-DOC-PROF] Error inesperado: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error interno del servidor"));
+        }
+    }
+
+    @DeleteMapping("/{id}/documento-profesor")
+    public ResponseEntity<?> eliminarDocumentoProfesor(@PathVariable Long id) {
+        try {
+            // Obtener la entrega
+            Optional<EntregaResponseDTO> entregaOpt = entregaService.findById(id);
+            if (entregaOpt.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "Entrega no encontrada con ID: " + id));
+            }
+
+            // Verificar permisos del profesor
+            Long profesorId = entregaService.getProfesorIdFromEntrega(id);
+
+            System.out.println("🗑️ [ELIMINAR-DOC] Eliminando documento del profesor para entrega ID: " + id);
+
+            // Llamar al service para eliminar el documento
+            EntregaResponseDTO entrega = entregaService.eliminarDocumentoProfesor(id, profesorId);
+
+            return ResponseEntity.ok(entrega);
+
+        } catch (ValidationException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            System.err.println("❌ [ELIMINAR-DOC] Error inesperado: " + e.getMessage());
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Error interno del servidor"));

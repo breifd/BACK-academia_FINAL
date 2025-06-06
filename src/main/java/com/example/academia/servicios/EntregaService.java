@@ -27,9 +27,15 @@ public interface EntregaService {
     EntregaResponseDTO saveEntrega(EntregaCreateDTO entrega);
 
     // Eliminar una entrega
+
+    EntregaResponseDTO eliminarDocumentoProfesor(Long entregaId, Long profesorId);
+
     void deleteEntrega(Long id);
 
     // -- Operaciones de búsqueda -- //
+    EntregaResponseDTO editarCalificacion(Long entregaId, CalificacionDTO calificacionDTO, Long profesorId);
+
+    EntregaResponseDTO editarCalificacionConDocumento(Long entregaId, CalificacionDTO calificacionDTO, Long profesorId, MultipartFile documentoProfesor) throws IOException;
 
     // Buscar entregas por tarea
     Page<EntregaResponseDTO> findByTarea(Long tareaId, int page, int size, String sort, String direction);

@@ -75,8 +75,100 @@ public class EntregaServiceImpl implements EntregaService {
     }
 
     @Override
+    @Transactional
+    public EntregaResponseDTO eliminarDocumentoProfesor(Long entregaId, Long profesorId) {
+        EntregaEntity entrega = entregaRepository.findById(entregaId)
+                .orElseThrow(() -> new ValidationException("Entrega no encontrada con ID: " + entregaId));
+
+        // Verificar permisos
+        if (!validarEntregaProfesor(entregaId, profesorId)) {
+            throw new ValidationException("No tiene permisos para eliminar el documento de esta entrega");
+        }
+
+        // Verificar que la entrega esté calificada
+        if (entrega.getEstado() != EntregaEntity.EstadoEntrega.CALIFICADA) {
+            throw new ValidationException("Solo se puede eliminar el documento de entregas calificadas");
+        }
+
+        // ✅ ELIMINAR EL DOCUMENTO DEL PROFESOR
+        entrega.setDocumentoProfesor(null);
+        entrega.setNombreDocumentoProfesor(null);
+        entrega.setTipoDocumentoProfesor(null);
+
+        EntregaEntity savedEntrega = entregaRepository.save(entrega);
+        return entregaMapper.toEntregaResponseDTO(savedEntrega);
+    }
+
+    @Override
     public void deleteEntrega(Long id) {
         entregaRepository.deleteById(id);
+    }
+
+    @Override
+    @Transactional
+    public EntregaResponseDTO editarCalificacion(Long entregaId, CalificacionDTO calificacionDTO, Long profesorId) {
+        EntregaEntity entrega = entregaRepository.findById(entregaId)
+                .orElseThrow(() -> new ValidationException("Entrega no encontrada con ID: " + entregaId));
+
+        // Verificar que el profesor puede editar esta calificación
+        if (!validarEntregaProfesor(entregaId, profesorId)) {
+            throw new ValidationException("El profesor no está autorizado para editar esta calificación");
+        }
+
+        // Verificar que la entrega está calificada
+        if (entrega.getEstado() != EntregaEntity.EstadoEntrega.CALIFICADA) {
+            throw new ValidationException("Solo se pueden editar entregas que ya están calificadas");
+        }
+
+        // Validar la nueva nota
+        if (calificacionDTO.getNota() < 0 || calificacionDTO.getNota() > 10) {
+            throw new ValidationException("La nota debe estar entre 0 y 10");
+        }
+
+        // Actualizar la calificación
+        calificacionMapper.updateEntregaFromCalificacion(calificacionDTO, entrega);
+        // Mantener el estado como CALIFICADA
+        entrega.setEstado(EntregaEntity.EstadoEntrega.CALIFICADA);
+
+        EntregaEntity savedEntrega = entregaRepository.save(entrega);
+        return entregaMapper.toEntregaResponseDTO(savedEntrega);
+    }
+
+
+    @Override
+    @Transactional
+    public EntregaResponseDTO editarCalificacionConDocumento(Long entregaId, CalificacionDTO calificacionDTO, Long profesorId, MultipartFile documentoProfesor) throws IOException {
+        EntregaEntity entrega = entregaRepository.findById(entregaId)
+                .orElseThrow(() -> new ValidationException("Entrega no encontrada con ID: " + entregaId));
+
+        // Verificar que el profesor puede editar esta calificación
+        if (!validarEntregaProfesor(entregaId, profesorId)) {
+            throw new ValidationException("El profesor no está autorizado para editar esta calificación");
+        }
+
+        // Verificar que la entrega está calificada
+        if (entrega.getEstado() != EntregaEntity.EstadoEntrega.CALIFICADA) {
+            throw new ValidationException("Solo se pueden editar entregas que ya están calificadas");
+        }
+
+        // Validar la nueva nota
+        if (calificacionDTO.getNota() < 0 || calificacionDTO.getNota() > 10) {
+            throw new ValidationException("La nota debe estar entre 0 y 10");
+        }
+
+        // Actualizar la calificación
+        calificacionMapper.updateEntregaFromCalificacion(calificacionDTO, entrega);
+        entrega.setEstado(EntregaEntity.EstadoEntrega.CALIFICADA);
+
+        // Actualizar documento del profesor si se proporcionó
+        if (documentoProfesor != null && !documentoProfesor.isEmpty()) {
+            entrega.setDocumentoProfesor(documentoProfesor.getBytes());
+            entrega.setNombreDocumentoProfesor(documentoProfesor.getOriginalFilename());
+            entrega.setTipoDocumentoProfesor(documentoProfesor.getContentType());
+        }
+
+        EntregaEntity savedEntrega = entregaRepository.save(entrega);
+        return entregaMapper.toEntregaResponseDTO(savedEntrega);
     }
 
     // -- Implementaciones de métodos de búsqueda -- //

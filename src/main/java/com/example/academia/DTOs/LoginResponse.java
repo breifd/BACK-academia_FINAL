@@ -24,7 +24,6 @@ public class LoginResponse {
     private Long profesorId;
     private Long alumnoId;
     private String errorCode;
-
     private String token;
     private String tokenType = "Bearer";
 
