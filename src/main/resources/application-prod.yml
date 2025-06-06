@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    database-platform: org.hibernate.dialect.MySQL8Dialect
+
+  profiles:
+    active: prod
+
+server:
+  port: ${PORT:8080}
+
+# CORS para el frontend deployado
+cors:
+  allowed-origins: ${FRONTEND_URL:http://localhost:4200}
+
+# JWT
+jwt:
+  expiration: ${JWT_EXPIRATION:86400000}
+  secret: ${JWT_SECRET:mySecretKeyForJWTTokenGenerationAcademiaApp2025SecureKey}

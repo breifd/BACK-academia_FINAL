@@ -99,19 +99,18 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Orígenes permitidos
-        configuration.setAllowedOriginPatterns(Arrays.asList("http://localhost:*", "https://localhost:*"));
+        // Permitir origins desde variables de entorno
+        String allowedOrigins = System.getenv("FRONTEND_URL");
+        if (allowedOrigins != null) {
+            configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
+        } else {
+            // Fallback para desarrollo
+            configuration.setAllowedOriginPatterns(Arrays.asList("http://localhost:*"));
+        }
 
-        // Métodos HTTP permitidos
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
-
-        // Headers permitidos
         configuration.setAllowedHeaders(Arrays.asList("*"));
-
-        // Permitir credenciales
         configuration.setAllowCredentials(true);
-
-        // Headers expuestos
         configuration.setExposedHeaders(Arrays.asList("Authorization"));
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

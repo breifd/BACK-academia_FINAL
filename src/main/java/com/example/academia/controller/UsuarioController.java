@@ -1,5 +1,6 @@
 package com.example.academia.controller;
 
+import com.example.academia.DTOs.CambioPasswordRequestDTO;
 import com.example.academia.DTOs.Created.UsuarioCreateDTO;
 import com.example.academia.DTOs.LoginResponse;
 import com.example.academia.DTOs.Response.UsuarioResponseDTO;
@@ -41,6 +42,47 @@ public class UsuarioController {
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
 
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody CambioPasswordRequestDTO request) {
+        try {
+            System.out.println("🔐 Solicitud de cambio de contraseña para: " + request.getUsername());
+
+            // Buscar el usuario
+            Optional<UsuarioEntity> usuarioOpt = usuarioRepository.findByUsername(request.getUsername());
+            if (usuarioOpt.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Usuario no encontrado"));
+            }
+
+            UsuarioEntity usuario = usuarioOpt.get();
+
+            // Verificar la contraseña actual
+            if (!passwordEncoder.matches(request.getCurrentPassword(), usuario.getPassword())) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "La contraseña actual es incorrecta"));
+            }
+
+            // Validar nueva contraseña
+            if (request.getNewPassword() == null || request.getNewPassword().trim().length() < 6) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "La nueva contraseña debe tener al menos 6 caracteres"));
+            }
+
+            // Actualizar contraseña
+            usuario.setPassword(passwordEncoder.encode(request.getNewPassword()));
+            usuarioRepository.save(usuario);
+
+            System.out.println("✅ Contraseña actualizada exitosamente para: " + request.getUsername());
+
+            return ResponseEntity.ok(Map.of("message", "Contraseña actualizada correctamente"));
+
+        } catch (Exception e) {
+            System.err.println("❌ Error cambiando contraseña: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error interno al cambiar la contraseña"));
+        }
+    }
     @GetMapping("/bcrypt-info")
     public String getAdminHash () {
             return "Hash para admin123: " + passwordEncoder.encode("admin123");
@@ -128,8 +170,9 @@ public class UsuarioController {
                     userDetails.getAlumnoId()
             );
 
-            // Crear respuesta exitosa con token
+            // ✅ USAR EL NUEVO MÉTODO CON ID
             LoginResponse response = LoginResponse.success(
+                    usuario.getId(), // ✅ INCLUIR ID DEL USUARIO
                     usuario.getUsername(),
                     usuario.getNombre(),
                     usuario.getApellido(),
@@ -138,12 +181,13 @@ public class UsuarioController {
                     userDetails.getAlumnoId(),
                     token
             );
-            System.out.println(response);
+
+            System.out.println("✅ Login exitoso para usuario ID: " + usuario.getId());
 
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-            e.printStackTrace(); // Para ver en consola el error real
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(LoginResponse.error("Error durante el proceso de login: " + e.getMessage(), "INTERNAL_ERROR"));
         }
@@ -235,8 +279,9 @@ public class UsuarioController {
             CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
             UsuarioEntity usuario = userDetails.getUsuario();
 
-            // Crear respuesta con datos del usuario actual
+            // ✅ INCLUIR ID EN LA RESPUESTA
             LoginResponse response = LoginResponse.success(
+                    usuario.getId(), // ✅ INCLUIR ID DEL USUARIO
                     usuario.getUsername(),
                     usuario.getNombre(),
                     usuario.getApellido(),
