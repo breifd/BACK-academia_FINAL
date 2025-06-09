@@ -360,6 +360,123 @@ public class UsuarioController {
                     .body(Map.of("error", "Error al cambiar contraseña: " + e.getMessage()));
         }
     }
+    @PostMapping("/cambiar-password")
+    public ResponseEntity<?> cambiarPassword(@RequestBody Map<String, String> request) {
+        try {
+            String username = request.get("username");
+            String passwordActual = request.get("passwordActual");
+            String passwordNueva = request.get("passwordNueva");
+
+            // Validaciones básicas
+            if (username == null || username.trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "El nombre de usuario es obligatorio"));
+            }
+
+            if (passwordActual == null || passwordActual.trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "La contraseña actual es obligatoria"));
+            }
+
+            if (passwordNueva == null || passwordNueva.trim().length() < 6) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "La nueva contraseña debe tener al menos 6 caracteres"));
+            }
+
+            // Buscar el usuario
+            Optional<UsuarioEntity> usuarioOpt = usuarioRepository.findByUsername(username);
+            if (usuarioOpt.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Usuario no encontrado"));
+            }
+
+            UsuarioEntity usuario = usuarioOpt.get();
+
+            // Verificar contraseña actual
+            if (!passwordEncoder.matches(passwordActual, usuario.getPassword())) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "La contraseña actual no es correcta"));
+            }
+
+            // Actualizar contraseña
+            usuario.setPassword(passwordEncoder.encode(passwordNueva));
+            usuarioRepository.save(usuario);
+
+            System.out.println("✅ Contraseña actualizada para usuario: " + username);
+
+            return ResponseEntity.ok(Map.of("message", "Contraseña actualizada correctamente"));
+
+        } catch (Exception e) {
+            System.err.println("❌ Error al cambiar contraseña: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error interno del servidor"));
+        }
+    }
+
+    // ================================
+// ALTERNATIVA: AGREGAR ENDPOINT ESPECÍFICO PARA ADMINISTRADORES
+// AGREGAR AL FINAL DE UsuarioController.java
+// ================================
+
+    @PutMapping("/admin/{id}/perfil")
+    public ResponseEntity<?> updatePerfilAdmin(@PathVariable Long id, @RequestBody Map<String, String> datos) {
+        try {
+            System.out.println("👑 === ENDPOINT ESPECÍFICO PARA ADMIN ===");
+            System.out.println("ID: " + id);
+            System.out.println("Datos: " + datos);
+
+            // ✅ BUSCAR USUARIO
+            UsuarioEntity usuario = usuarioRepository.findById(id)
+                    .orElseThrow(() -> new ValidationException("Usuario no encontrado"));
+
+            // ✅ VERIFICAR QUE SEA ADMINISTRADOR
+            if (usuario.getRol() != UsuarioEntity.Rol.Admin) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Este endpoint es solo para administradores"));
+            }
+
+            // ✅ ACTUALIZAR SOLO NOMBRE Y APELLIDO
+            String nombre = datos.get("nombre");
+            String apellido = datos.get("apellido");
+
+            if (nombre == null || nombre.trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "El nombre es obligatorio"));
+            }
+
+            if (apellido == null || apellido.trim().isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "El apellido es obligatorio"));
+            }
+
+            usuario.setNombre(nombre.trim());
+            usuario.setApellido(apellido.trim());
+
+            // ✅ GUARDAR SIN VALIDACIONES COMPLEJAS
+            UsuarioEntity usuarioActualizado = usuarioRepository.save(usuario);
+
+            // ✅ CREAR RESPUESTA MANUAL
+            Map<String, Object> response = new HashMap<>();
+            response.put("id", usuarioActualizado.getId());
+            response.put("username", usuarioActualizado.getUsername());
+            response.put("nombre", usuarioActualizado.getNombre());
+            response.put("apellido", usuarioActualizado.getApellido());
+            response.put("rol", usuarioActualizado.getRol());
+            response.put("profesor", null);
+            response.put("alumno", null);
+
+            System.out.println("✅ Administrador actualizado exitosamente");
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            System.err.println("❌ Error en endpoint admin: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error al actualizar perfil de administrador"));
+        }
+    }
 
 
     @ExceptionHandler(ValidationException.class)
