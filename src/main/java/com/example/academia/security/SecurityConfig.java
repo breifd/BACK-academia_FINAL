@@ -105,7 +105,7 @@ public class SecurityConfig {
             configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
         } else {
             // Fallback para desarrollo
-            configuration.setAllowedOriginPatterns(Arrays.asList("http://localhost:*"));
+            configuration.setAllowedOriginPatterns(Arrays.asList("http://localhost:*", "https://*.up.railway.app", "https://tu-frontend.vercel.app"));
         }
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
