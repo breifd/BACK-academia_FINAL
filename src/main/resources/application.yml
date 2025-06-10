@@ -1,0 +1,50 @@
+spring:
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+
+  # Configuración de base de datos para desarrollo local
+  datasource:
+    url: jdbc:mysql://localhost:3306/academia_db?createDatabaseIfNotExist=true&useSSL=false&serverTimezone=UTC
+    username: root
+    password: password
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    database-platform: org.hibernate.dialect.MySQL8Dialect
+    properties:
+      hibernate:
+        format_sql: true
+
+  # Configuración para subida de archivos
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+
+  # Inicializar datos
+  sql:
+    init:
+      mode: always
+
+# Puerto del servidor
+server:
+  port: ${PORT:8080}
+
+# Configuración JWT
+jwt:
+  expiration: ${JWT_EXPIRATION:86400000}
+  secret: ${JWT_SECRET:mySecretKeyForJWTTokenGenerationAcademiaApp2025SecureKey}
+
+# Configuración CORS
+cors:
+  allowed-origins: ${FRONTEND_URL:http://localhost:4200}
+
+# Logging para desarrollo
+logging:
+  level:
+    com.example.academia: DEBUG
+    org.springframework.security: DEBUG
+    org.hibernate.SQL: DEBUG
