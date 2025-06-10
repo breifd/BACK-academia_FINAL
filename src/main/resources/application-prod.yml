@@ -1,22 +1,26 @@
 spring:
   datasource:
-    url: ${DATABASE_URL:jdbc:mysql://localhost:3306/test}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:password}
+    url: ${DATABASE_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:
     hibernate:
-      ddl-auto: create-drop
+      ddl-auto: update  # CAMBIADO: "update" conserva datos, "create-drop" los borra
     show-sql: false
     database-platform: org.hibernate.dialect.MySQL8Dialect
     properties:
       hibernate:
         dialect: org.hibernate.dialect.MySQL8Dialect
 
+  sql:
+    init:
+      mode: ${SPRING_SQL_INIT_MODE:never}  # Por defecto "never"
+
 server:
   port: ${PORT:8080}
 
 jwt:
   expiration: ${JWT_EXPIRATION:86400000}
-  secret: ${JWT_SECRET:mySecretKeyForJWTTokenGenerationAcademiaApp2025SecureKey}y}
+  secret: ${JWT_SECRET:mySecretKeyForJWTTokenGenerationAcademiaApp2025SecureKey}
