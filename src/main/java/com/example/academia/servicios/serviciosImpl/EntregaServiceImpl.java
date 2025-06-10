@@ -281,26 +281,85 @@ public class EntregaServiceImpl implements EntregaService {
         EntregaEntity entrega = entregaRepository.findById(entregaId)
                 .orElseThrow(() -> new ValidationException("Entrega no encontrada con ID: " + entregaId));
 
-        // ✅ MANTENER LA VALIDACIÓN
+        // ✅ VALIDACIÓN CORREGIDA: Solo verificar permisos del profesor
         if (!validarEntregaProfesor(entregaId, profesorId)) {
             throw new ValidationException("El profesor no está autorizado para calificar esta entrega");
         }
 
+        // ✅ VALIDACIÓN CORREGIDA: Verificar que la entrega NO esté ya calificada
+        if (entrega.getEstado() == EntregaEntity.EstadoEntrega.CALIFICADA) {
+            throw new ValidationException("Esta entrega ya está calificada. Use el método de edición para modificar la calificación.");
+        }
+
+        // ✅ VALIDACIÓN: Verificar que la entrega esté en estado ENTREGADA
+        if (entrega.getEstado() != EntregaEntity.EstadoEntrega.ENTREGADA) {
+            throw new ValidationException("Solo se pueden calificar entregas en estado 'ENTREGADA'. Estado actual: " + entrega.getEstado());
+        }
+
+        // ✅ VALIDACIÓN: Verificar que la entrega tenga documento (opcional, depende de tus reglas)
         if (entrega.getDocumento() == null || entrega.getDocumento().length == 0) {
             throw new ValidationException("La entrega no tiene documento para calificar");
         }
 
+        // ✅ VALIDACIÓN: Verificar rango de nota
         if (calificacionDTO.getNota() < 0 || calificacionDTO.getNota() > 10) {
             throw new ValidationException("La nota debe estar entre 0 y 10");
         }
 
+        // ✅ APLICAR CALIFICACIÓN
         calificacionMapper.updateEntregaFromCalificacion(calificacionDTO, entrega);
         entrega.setEstado(EntregaEntity.EstadoEntrega.CALIFICADA);
 
         EntregaEntity savedEntrega = entregaRepository.save(entrega);
         return entregaMapper.toEntregaResponseDTO(savedEntrega);
     }
-    // -- Implementaciones de métodos de estadísticas -- //
+
+    // ✅ NUEVO MÉTODO: Para calificar con documento
+    @Override
+    @Transactional
+    public EntregaResponseDTO calificarEntregaConDocumento(Long entregaId, CalificacionDTO calificacionDTO, Long profesorId, MultipartFile documentoProfesor) throws IOException {
+        EntregaEntity entrega = entregaRepository.findById(entregaId)
+                .orElseThrow(() -> new ValidationException("Entrega no encontrada con ID: " + entregaId));
+
+        // ✅ VALIDACIÓN: Verificar permisos del profesor
+        if (!validarEntregaProfesor(entregaId, profesorId)) {
+            throw new ValidationException("El profesor no está autorizado para calificar esta entrega");
+        }
+
+        // ✅ VALIDACIÓN: Verificar que la entrega NO esté ya calificada
+        if (entrega.getEstado() == EntregaEntity.EstadoEntrega.CALIFICADA) {
+            throw new ValidationException("Esta entrega ya está calificada. Use el método de edición para modificar la calificación.");
+        }
+
+        // ✅ VALIDACIÓN: Verificar que la entrega esté en estado ENTREGADA
+        if (entrega.getEstado() != EntregaEntity.EstadoEntrega.ENTREGADA) {
+            throw new ValidationException("Solo se pueden calificar entregas en estado 'ENTREGADA'. Estado actual: " + entrega.getEstado());
+        }
+
+        // ✅ VALIDACIÓN: Verificar que la entrega tenga documento del alumno
+        if (entrega.getDocumento() == null || entrega.getDocumento().length == 0) {
+            throw new ValidationException("La entrega no tiene documento para calificar");
+        }
+
+        // ✅ VALIDACIÓN: Verificar rango de nota
+        if (calificacionDTO.getNota() < 0 || calificacionDTO.getNota() > 10) {
+            throw new ValidationException("La nota debe estar entre 0 y 10");
+        }
+
+        // ✅ APLICAR CALIFICACIÓN
+        calificacionMapper.updateEntregaFromCalificacion(calificacionDTO, entrega);
+        entrega.setEstado(EntregaEntity.EstadoEntrega.CALIFICADA);
+
+        // ✅ AGREGAR DOCUMENTO DEL PROFESOR si se proporcionó
+        if (documentoProfesor != null && !documentoProfesor.isEmpty()) {
+            entrega.setDocumentoProfesor(documentoProfesor.getBytes());
+            entrega.setNombreDocumentoProfesor(documentoProfesor.getOriginalFilename());
+            entrega.setTipoDocumentoProfesor(documentoProfesor.getContentType());
+        }
+
+        EntregaEntity savedEntrega = entregaRepository.save(entrega);
+        return entregaMapper.toEntregaResponseDTO(savedEntrega);
+    }
 
     @Override
     public Long countEntregasPendientesCalificacion(Long profesorId) {
@@ -312,41 +371,6 @@ public class EntregaServiceImpl implements EntregaService {
         return entregaRepository.getNotaMediaByTarea(tareaId);
     }
 
-    @Override
-    public EntregaResponseDTO calificarEntregaConDocumento(Long entregaId, CalificacionDTO calificacionDTO, Long profesorId, MultipartFile documentoProfesor) throws IOException {
-        // Verificar que la entrega existe
-        EntregaEntity entrega = entregaRepository.findById(entregaId)
-                .orElseThrow(() -> new ValidationException("Entrega no encontrada con ID: " + entregaId));
-
-        // Verificar que el profesor de la tarea coincide con el que intenta calificar
-        if (!validarEntregaProfesor(entregaId, profesorId)) {
-            throw new ValidationException("El profesor no está autorizado para calificar esta entrega");
-        }
-
-        // Verificar que la entrega tiene documento del alumno
-        if (entrega.getDocumento() == null || entrega.getDocumento().length == 0) {
-            throw new ValidationException("La entrega no tiene documento para calificar");
-        }
-
-        // Verificar que la calificación es válida (entre 0 y 10)
-        if (calificacionDTO.getNota() < 0 || calificacionDTO.getNota() > 10) {
-            throw new ValidationException("La nota debe estar entre 0 y 10");
-        }
-
-        // Actualizar la calificación
-        calificacionMapper.updateEntregaFromCalificacion(calificacionDTO, entrega);
-        entrega.setEstado(EntregaEntity.EstadoEntrega.CALIFICADA);
-
-        // Agregar documento del profesor si se proporcionó
-        if (documentoProfesor != null && !documentoProfesor.isEmpty()) {
-            entrega.setDocumentoProfesor(documentoProfesor.getBytes());
-            entrega.setNombreDocumentoProfesor(documentoProfesor.getOriginalFilename());
-            entrega.setTipoDocumentoProfesor(documentoProfesor.getContentType());
-        }
-
-        EntregaEntity savedEntrega = entregaRepository.save(entrega);
-        return entregaMapper.toEntregaResponseDTO(savedEntrega);
-    }
 
     @Override
     public DocumentoDTO downloadDocumentoProfesor(Long entregaId) {
