@@ -100,13 +100,11 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         // Permitir origins desde variables de entorno
-        String allowedOrigins = System.getenv("FRONTEND_URL");
-        if (allowedOrigins != null) {
-            configuration.setAllowedOrigins(Arrays.asList(allowedOrigins.split(",")));
-        } else {
-            // Fallback para desarrollo
-            configuration.setAllowedOriginPatterns(Arrays.asList("http://localhost:*", "https://*.up.railway.app", "https://tu-frontend.vercel.app"));
-        }
+        configuration.setAllowedOrigins(Arrays.asList(
+                "http://localhost:4200",                                    // Local
+                "https://academia-management-front.vercel.app",             // Tu Vercel
+                "https://academia-management-front-*.vercel.app"            // Previews de Vercel
+        ));
 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
