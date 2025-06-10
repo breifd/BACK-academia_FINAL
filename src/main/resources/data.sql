@@ -4,15 +4,7 @@
 -- ===================================================
 
 -- Limpiar datos existentes (opcional - comentar si no deseas borrar)
-DELETE FROM entregas;
-DELETE FROM tarea_alumnos;
-DELETE FROM tareas;
-DELETE FROM curso_alumnos;
-DELETE FROM curso_profesores;
-DELETE FROM usuarios;
-DELETE FROM cursos;
-DELETE FROM alumnos;
-DELETE FROM profesores;
+
 
 -- ===================================================
 -- 1. INSERTAR PROFESORES
